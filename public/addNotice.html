@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Add Notice</title>
+</head>
+<body>
+  <h2>Add Notice</h2>
+
+  <input type="text" id="title" placeholder="Notice Title"><br><br>
+
+  <textarea id="description" placeholder="Notice Description"></textarea><br><br>
+
+  <input type="text" id="category" placeholder="Category"><br><br>
+
+  <button onclick="addNotice()">Add Notice</button>
+
+  <p id="msg"></p>
+
+  <br>
+  <a href="viewNotices.html">View Notices</a>
+
+  <script>
+    function addNotice() {
+      fetch('http://localhost:3000/api/notices/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: document.getElementById('title').value,
+          description: document.getElementById('description').value,
+          category: document.getElementById('category').value
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('msg').innerText = data.message;
+      });
+    }
+  </script>
+</body>
+</html>
