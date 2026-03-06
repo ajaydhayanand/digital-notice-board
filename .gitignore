@@ -1,2 +1,5 @@
 node_modules/
 .env
+client/build/
+client/*.log
+server/*.log
