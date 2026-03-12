@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useToast } from "../components/ToastProvider";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getNoticeById, updateReadStatus } from "../services/api";
+import { getNoticeById, resolveAttachmentUrl, updateReadStatus } from "../services/api";
 
 function NoticeDetails() {
   const { addToast } = useToast();
@@ -93,8 +93,21 @@ function NoticeDetails() {
         </div>
         <h2 className="mb-4 text-2xl font-bold text-slate-900">{notice.title}</h2>
         <p className="whitespace-pre-wrap leading-7 text-slate-700">{notice.description}</p>
+        {notice.attachmentUrl && (
+          <a
+            href={resolveAttachmentUrl(notice.attachmentUrl)}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-500"
+          >
+            Open attachment
+          </a>
+        )}
         <div className="mt-6 grid gap-1 text-xs text-slate-500 sm:text-sm">
           <p>Created by: {notice.createdBy || "admin"}</p>
+          <p>Status: {notice.status || "published"}</p>
+          <p>Publish at: {notice.publishAt ? new Date(notice.publishAt).toLocaleString() : "-"}</p>
+          {notice.expiresAt && <p>Expires at: {new Date(notice.expiresAt).toLocaleString()}</p>}
           <p>Created at: {new Date(notice.createdAt).toLocaleString()}</p>
         </div>
         <button

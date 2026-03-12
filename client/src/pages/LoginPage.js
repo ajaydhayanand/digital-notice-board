@@ -20,8 +20,10 @@ function LoginPage() {
       const response = await login(credentials);
       saveAuth(response.data.token, response.data.user);
       addToast({ type: "success", message: "Login successful" });
-      if (response.data.user?.role === "admin") {
+      if (["superadmin", "admin", "editor"].includes(response.data.user?.role)) {
         navigate("/admin");
+      } else if (response.data.user?.role === "viewer") {
+        navigate("/admin/insights");
       } else {
         navigate("/");
       }

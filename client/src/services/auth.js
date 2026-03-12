@@ -19,7 +19,8 @@ export const getCurrentUser = () => {
   }
 };
 export const getUserRole = () => getCurrentUser()?.role || "";
-export const isAdmin = () => getUserRole() === "admin";
+export const isAdmin = () => ["superadmin", "admin", "editor", "viewer"].includes(getUserRole());
+export const canManageNotices = () => ["superadmin", "admin", "editor"].includes(getUserRole());
 
 export const logout = () => {
   sessionStorage.removeItem(TOKEN_KEY);

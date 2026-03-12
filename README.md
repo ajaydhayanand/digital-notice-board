@@ -57,10 +57,13 @@ npm start
 Frontend URL: `http://localhost:3000`
 
 ## Core Features
-- Admin login (JWT)
-- Notice CRUD (admin)
-- Public notice listing/details
-- Search + category filtering + pagination
-- Responsive UI (mobile + desktop)
-- Loaders and toast notifications
-
+- Role-based login (superadmin/admin/editor/viewer/student)
+- Notice CRUD with scheduling, expiry, archive status
+- File attachment upload (PDF/image)
+- Search + category filtering + pagination + read/unread
+- Important notices with color highlighting
+- Live updates (SSE + polling fallback)
+- Notification subscriptions (email/whatsapp/push) + delivery logs
+- Audit logs and analytics dashboard
+- Reports export (CSV + printable report for PDF save)
+- Responsive UI (mobile + desktop), loaders and toast notifications

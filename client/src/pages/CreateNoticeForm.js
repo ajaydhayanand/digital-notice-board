@@ -2,13 +2,16 @@ import React, { useState } from "react";
 import { useToast } from "../components/ToastProvider";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { createNotice } from "../services/api";
+import { createNotice, resolveAttachmentUrl, uploadAttachment } from "../services/api";
 
 const initialState = {
   title: "",
   description: "",
   category: "",
   isImportant: false,
+  attachmentUrl: "",
+  publishAt: "",
+  expiresAt: "",
 };
 
 function CreateNoticeForm() {
@@ -16,6 +19,7 @@ function CreateNoticeForm() {
   const [formData, setFormData] = useState(initialState);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -29,7 +33,12 @@ function CreateNoticeForm() {
     setError("");
 
     try {
-      await createNotice(formData);
+      await createNotice({
+        ...formData,
+        publishAt: formData.publishAt || null,
+        expiresAt: formData.expiresAt || null,
+        attachmentUrl: formData.attachmentUrl || null,
+      });
       addToast({ type: "success", message: "Notice created successfully" });
       navigate("/admin");
     } catch (err) {
@@ -38,6 +47,24 @@ function CreateNoticeForm() {
       addToast({ type: "error", message });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAttachment = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const response = await uploadAttachment(file);
+      setFormData((prev) => ({ ...prev, attachmentUrl: response.data?.url || "" }));
+      addToast({ type: "success", message: "Attachment uploaded" });
+    } catch (err) {
+      const message = err.response?.data?.message || "Attachment upload failed";
+      setError(message);
+      addToast({ type: "error", message });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -114,6 +141,60 @@ function CreateNoticeForm() {
             />
             Mark this notice as important
           </label>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="publishAt">
+                Publish At
+              </label>
+              <input
+                id="publishAt"
+                name="publishAt"
+                type="datetime-local"
+                value={formData.publishAt}
+                onChange={handleChange}
+                className="input-base"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="expiresAt">
+                Expires At
+              </label>
+              <input
+                id="expiresAt"
+                name="expiresAt"
+                type="datetime-local"
+                value={formData.expiresAt}
+                onChange={handleChange}
+                className="input-base"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="attachmentFile">
+              Attachment (PDF/Image)
+            </label>
+            <input
+              id="attachmentFile"
+              name="attachmentFile"
+              type="file"
+              accept=".pdf,image/*"
+              onChange={handleAttachment}
+              className="input-base"
+            />
+            {uploading && <p className="mt-1 text-xs text-slate-500">Uploading attachment...</p>}
+            {formData.attachmentUrl && (
+              <a
+                href={resolveAttachmentUrl(formData.attachmentUrl)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-block text-xs font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                View uploaded file
+              </a>
+            )}
+          </div>
 
           <button
             type="submit"

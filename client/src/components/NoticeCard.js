@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { resolveAttachmentUrl } from "../services/api";
 
 function NoticeCard({ notice }) {
   return (
@@ -28,6 +29,16 @@ function NoticeCard({ notice }) {
         {notice.description.slice(0, 160)}
         {notice.description.length > 160 ? "..." : ""}
       </p>
+      {notice.attachmentUrl && (
+        <a
+          href={resolveAttachmentUrl(notice.attachmentUrl)}
+          target="_blank"
+          rel="noreferrer"
+          className="mb-3 inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-500"
+        >
+          Open Attachment
+        </a>
+      )}
       <div className="mt-auto flex items-center justify-between gap-2">
         <p className="text-xs text-slate-500">By {notice.createdBy || "admin"}</p>
         <Link

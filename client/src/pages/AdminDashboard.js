@@ -6,8 +6,10 @@ import {
   deleteNotice,
   getNoticeCategories,
   getNotices,
+  resolveAttachmentUrl,
   updateImportantStatus,
   updateNotice,
+  uploadAttachment,
 } from "../services/api";
 
 function AdminDashboard() {
@@ -20,6 +22,7 @@ function AdminDashboard() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -34,27 +37,29 @@ function AdminDashboard() {
     description: "",
     category: "",
     isImportant: false,
+    attachmentUrl: "",
+    publishAt: "",
+    expiresAt: "",
   });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSearch(searchInput.trim());
       setPage(1);
     }, 350);
-
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const response = await getNoticeCategories();
+        const response = await getNoticeCategories({ includeAll: true });
         setCategories(response.data?.data || []);
       } catch (err) {
         setCategories([]);
       }
     };
-
     loadCategories();
   }, []);
 
@@ -63,33 +68,23 @@ function AdminDashboard() {
     setError("");
     try {
       const response = await getNotices({
+        includeAll: true,
         search,
         category,
+        status,
         page,
         limit: 8,
       });
-
-      if (Array.isArray(response.data)) {
-        setNotices(response.data);
-        setPagination({
+      setNotices(response.data?.data || []);
+      setPagination(
+        response.data?.pagination || {
           page: 1,
           totalPages: 1,
           hasNextPage: false,
           hasPrevPage: false,
-          total: response.data.length,
-        });
-      } else {
-        setNotices(response.data?.data || []);
-        setPagination(
-          response.data?.pagination || {
-            page: 1,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPrevPage: false,
-            total: 0,
-          }
-        );
-      }
+          total: 0,
+        }
+      );
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load notices");
     } finally {
@@ -99,7 +94,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     loadNotices();
-  }, [search, category, page]);
+  }, [search, category, status, page]);
 
   const handleDelete = async (id) => {
     setError("");
@@ -130,6 +125,15 @@ function AdminDashboard() {
     }
   };
 
+  const toDateInput = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    const pad = (num) => String(num).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+      date.getMinutes()
+    )}`;
+  };
+
   const startEditing = (notice) => {
     setEditingId(notice._id);
     setEditForm({
@@ -137,6 +141,9 @@ function AdminDashboard() {
       description: notice.description,
       category: notice.category,
       isImportant: Boolean(notice.isImportant),
+      attachmentUrl: notice.attachmentUrl || "",
+      publishAt: toDateInput(notice.publishAt),
+      expiresAt: toDateInput(notice.expiresAt),
     });
   };
 
@@ -147,6 +154,9 @@ function AdminDashboard() {
       description: "",
       category: "",
       isImportant: false,
+      attachmentUrl: "",
+      publishAt: "",
+      expiresAt: "",
     });
   };
 
@@ -155,7 +165,12 @@ function AdminDashboard() {
     if (!editingId) return;
     setSaving(true);
     try {
-      await updateNotice(editingId, editForm);
+      await updateNotice(editingId, {
+        ...editForm,
+        publishAt: editForm.publishAt || null,
+        expiresAt: editForm.expiresAt || null,
+        attachmentUrl: editForm.attachmentUrl || null,
+      });
       addToast({ type: "success", message: "Notice updated successfully" });
       cancelEditing();
       await loadNotices();
@@ -169,6 +184,21 @@ function AdminDashboard() {
     }
   };
 
+  const handleAttachment = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploading(true);
+      const response = await uploadAttachment(file);
+      setEditForm((prev) => ({ ...prev, attachmentUrl: response.data?.url || "" }));
+      addToast({ type: "success", message: "Attachment uploaded" });
+    } catch (err) {
+      addToast({ type: "error", message: err.response?.data?.message || "Upload failed" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <section className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -176,14 +206,19 @@ function AdminDashboard() {
           <h2 className="bg-gradient-to-r from-slate-900 via-indigo-700 to-cyan-700 bg-clip-text text-2xl font-extrabold text-transparent">
             Admin Dashboard
           </h2>
-          <p className="text-sm text-slate-600">Create and manage published notices.</p>
+          <p className="text-sm text-slate-600">Create, schedule, archive, and manage notices.</p>
         </div>
-        <Link to="/admin/create" className="btn-primary w-fit">
-          Create Notice
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/admin/create" className="btn-primary w-fit">
+            Create Notice
+          </Link>
+          <Link to="/admin/insights" className="btn-secondary w-fit">
+            Insights & Reports
+          </Link>
+        </div>
       </div>
 
-      <div className="panel grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
+      <div className="panel grid grid-cols-1 gap-3 p-4 sm:grid-cols-4">
         <input
           type="text"
           value={searchInput}
@@ -205,6 +240,19 @@ function AdminDashboard() {
               {item}
             </option>
           ))}
+        </select>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className="input-base"
+        >
+          <option value="">All statuses</option>
+          <option value="published">Published</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="archived">Archived</option>
         </select>
       </div>
 
@@ -254,6 +302,20 @@ function AdminDashboard() {
                     placeholder="Description"
                     required
                   />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <input
+                      type="datetime-local"
+                      value={editForm.publishAt}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, publishAt: e.target.value }))}
+                      className="input-base"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={editForm.expiresAt}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, expiresAt: e.target.value }))}
+                      className="input-base"
+                    />
+                  </div>
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                     <input
                       type="checkbox"
@@ -262,19 +324,23 @@ function AdminDashboard() {
                     />
                     Mark as important
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="btn-primary text-xs disabled:opacity-60"
+                  <input type="file" accept=".pdf,image/*" onChange={handleAttachment} className="input-base" />
+                  {uploading && <p className="text-xs text-slate-500">Uploading...</p>}
+                  {editForm.attachmentUrl && (
+                    <a
+                      href={resolveAttachmentUrl(editForm.attachmentUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-indigo-600"
                     >
+                      View Attachment
+                    </a>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button type="submit" disabled={saving} className="btn-primary text-xs disabled:opacity-60">
                       {saving ? "Saving..." : "Save"}
                     </button>
-                    <button
-                      type="button"
-                      onClick={cancelEditing}
-                      className="btn-secondary text-xs"
-                    >
+                    <button type="button" onClick={cancelEditing} className="btn-secondary text-xs">
                       Cancel
                     </button>
                   </div>
@@ -283,22 +349,27 @@ function AdminDashboard() {
                 <>
                   <div className="mb-1 flex flex-wrap items-center gap-2">
                     <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">{notice.category}</p>
-                    {notice.isImportant && (
-                      <span className="chip bg-amber-100 text-amber-700">
-                        Important
-                      </span>
-                    )}
+                    <span className="chip bg-slate-200 text-slate-700">{notice.status}</span>
+                    {notice.isImportant && <span className="chip bg-amber-100 text-amber-700">Important</span>}
                   </div>
                   <h3 className="mb-2 text-lg font-semibold text-slate-900">{notice.title}</h3>
-                  <p className="mb-3 text-sm text-slate-600">{notice.description}</p>
-                  <div className="flex items-center justify-between">
+                  <p className="mb-2 text-sm text-slate-600">{notice.description}</p>
+                  {notice.attachmentUrl && (
+                    <a
+                      href={resolveAttachmentUrl(notice.attachmentUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mb-2 inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-500"
+                    >
+                      Open Attachment
+                    </a>
+                  )}
+                  <p className="text-xs text-slate-500">Publish: {new Date(notice.publishAt).toLocaleString()}</p>
+                  {notice.expiresAt && <p className="text-xs text-slate-500">Expires: {new Date(notice.expiresAt).toLocaleString()}</p>}
+                  <div className="mt-3 flex items-center justify-between">
                     <p className="text-xs text-slate-500">By {notice.createdBy || "admin"}</p>
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditing(notice)}
-                        className="btn-secondary text-xs"
-                      >
+                      <button type="button" onClick={() => startEditing(notice)} className="btn-secondary text-xs">
                         Edit
                       </button>
                       <button
@@ -308,11 +379,7 @@ function AdminDashboard() {
                       >
                         {notice.isImportant ? "Unmark" : "Mark Important"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(notice._id)}
-                        className="btn-danger text-xs"
-                      >
+                      <button type="button" onClick={() => handleDelete(notice._id)} className="btn-danger text-xs">
                         Delete
                       </button>
                     </div>

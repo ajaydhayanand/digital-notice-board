@@ -5,15 +5,24 @@ import NoticeDetails from "./pages/NoticeDetails";
 import AdminDashboard from "./pages/AdminDashboard";
 import CreateNoticeForm from "./pages/CreateNoticeForm";
 import LoginPage from "./pages/LoginPage";
+import AdminInsights from "./pages/AdminInsights";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ToastProvider } from "./components/ToastProvider";
-import { AUTH_CHANGED_EVENT, getCurrentUser, isAdmin, isAuthenticated, logout } from "./services/auth";
+import {
+  AUTH_CHANGED_EVENT,
+  canManageNotices,
+  getCurrentUser,
+  isAdmin,
+  isAuthenticated,
+  logout,
+} from "./services/auth";
 
 function App() {
   const [authState, setAuthState] = useState({
     authenticated: isAuthenticated(),
     user: getCurrentUser(),
     admin: isAdmin(),
+    manager: canManageNotices(),
   });
 
   useEffect(() => {
@@ -22,6 +31,7 @@ function App() {
         authenticated: isAuthenticated(),
         user: getCurrentUser(),
         admin: isAdmin(),
+        manager: canManageNotices(),
       });
     };
 
@@ -29,7 +39,7 @@ function App() {
     return () => window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
   }, []);
 
-  const { authenticated, user: currentUser, admin } = authState;
+  const { authenticated, user: currentUser, admin, manager } = authState;
 
   return (
     <ToastProvider>
@@ -48,10 +58,18 @@ function App() {
               </Link>
               {admin && (
                 <Link
-                  to="/admin"
+                  to={manager ? "/admin" : "/admin/insights"}
                   className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                 >
                   Admin Dashboard
+                </Link>
+              )}
+              {admin && (
+                <Link
+                  to="/admin/insights"
+                  className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Insights
                 </Link>
               )}
               {authenticated && (
@@ -84,7 +102,7 @@ function App() {
             <Route
               path="/"
               element={
-                <ProtectedRoute allowedRoles={["student", "admin"]}>
+                <ProtectedRoute allowedRoles={["student", "viewer", "editor", "admin", "superadmin"]}>
                   <NoticeList />
                 </ProtectedRoute>
               }
@@ -92,7 +110,7 @@ function App() {
             <Route
               path="/notices/:id"
               element={
-                <ProtectedRoute allowedRoles={["student", "admin"]}>
+                <ProtectedRoute allowedRoles={["student", "viewer", "editor", "admin", "superadmin"]}>
                   <NoticeDetails />
                 </ProtectedRoute>
               }
@@ -101,15 +119,23 @@ function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["editor", "admin", "superadmin"]}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/insights"
+              element={
+                <ProtectedRoute allowedRoles={["viewer", "editor", "admin", "superadmin"]}>
+                  <AdminInsights />
                 </ProtectedRoute>
               }
             />
             <Route
               path="/admin/create"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["editor", "admin", "superadmin"]}>
                   <CreateNoticeForm />
                 </ProtectedRoute>
               }

@@ -1,9 +1,3 @@
-const requireAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== "admin") {
-    return res.status(403).json({ message: "Forbidden: admin access required" });
-  }
+const authorizeRoles = require("./authorizeRoles");
 
-  return next();
-};
-
-module.exports = requireAdmin;
+module.exports = authorizeRoles("superadmin", "admin", "editor");

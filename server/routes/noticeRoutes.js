@@ -25,6 +25,9 @@ const noticeValidation = [
     .withMessage("Description must be 5-2000 characters"),
   body("category").trim().isLength({ min: 2, max: 60 }).withMessage("Category must be 2-60 characters"),
   body("isImportant").optional().isBoolean().withMessage("isImportant must be boolean"),
+  body("attachmentUrl").optional({ nullable: true, checkFalsy: true }).isLength({ max: 500 }).withMessage("attachmentUrl too long"),
+  body("publishAt").optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage("publishAt must be a valid date"),
+  body("expiresAt").optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage("expiresAt must be a valid date"),
 ];
 
 const idValidation = [param("id").isInt({ min: 1 }).withMessage("Invalid notice id")];
