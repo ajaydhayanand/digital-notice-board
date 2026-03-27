@@ -4,8 +4,8 @@ const noticeSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
       maxlength: 120,
     },
     description: {

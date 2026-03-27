@@ -9,6 +9,34 @@ import { ToastProvider } from "./components/ToastProvider";
 import Sidebar from "./components/Sidebar";
 import { AUTH_CHANGED_EVENT, getCurrentUser, getStoredTheme, isAuthenticated, saveTheme } from "./services/auth";
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    console.error("App crashed:", error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="m-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 p-6 text-sm text-rose-100">
+          <h1 className="mb-3 text-xl font-semibold">App Error</h1>
+          <pre className="whitespace-pre-wrap break-words">{this.state.error.message}</pre>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function AppShell() {
   const [theme, setTheme] = useState(getStoredTheme());
   const [user, setUser] = useState(getCurrentUser());
@@ -78,9 +106,11 @@ function AppShell() {
 
 function App() {
   return (
-    <ToastProvider>
-      <AppShell />
-    </ToastProvider>
+    <AppErrorBoundary>
+      <ToastProvider>
+        <AppShell />
+      </ToastProvider>
+    </AppErrorBoundary>
   );
 }
 

@@ -109,7 +109,7 @@ function AdminDashboard() {
   const beginEdit = (notice) => {
     setEditingId(notice.id);
     setForm({
-      title: notice.title,
+      title: notice.rawTitle || "",
       description: notice.description,
       attachmentUrl: notice.attachmentUrl || "",
       isImportant: Boolean(notice.isImportant),
@@ -186,14 +186,13 @@ function AdminDashboard() {
           <div className="mt-6 space-y-4">
             <input
               className="input-base"
-              placeholder="Notice title"
+              placeholder="Optional title"
               value={form.title}
               onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              required
             />
             <textarea
               className="input-base min-h-36"
-              placeholder="Write a clear description for the notice"
+              placeholder="Write the notice message"
               value={form.description}
               onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
               required
@@ -207,6 +206,7 @@ function AdminDashboard() {
                   value={form.publishAt}
                   onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
                 />
+                <p className="mt-2 text-xs text-slate-400">Leave empty to publish immediately.</p>
               </label>
               <label className="flex items-end gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white">
                 <input
@@ -224,6 +224,7 @@ function AdminDashboard() {
               </span>
               <input type="file" accept=".pdf,image/*" onChange={handleAttachment} className="hidden" />
             </label>
+            <p className="text-xs text-slate-400">Attachment is optional. You can send a message-only notice.</p>
             <button type="submit" disabled={saving} className="btn-primary w-full justify-center">
               {saving ? (
                 "Saving..."

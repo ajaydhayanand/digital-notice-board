@@ -4,21 +4,21 @@ const AUTH_EVENT = "digital-notice-board-auth";
 const THEME_KEY = "digital-notice-board-theme";
 
 export const saveAuth = (token, user) => {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  sessionStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   window.dispatchEvent(new Event(AUTH_EVENT));
 };
 
 export const clearAuth = () => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
   window.dispatchEvent(new Event(AUTH_EVENT));
 };
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const getToken = () => sessionStorage.getItem(TOKEN_KEY);
 
 export const getCurrentUser = () => {
-  const raw = localStorage.getItem(USER_KEY);
+  const raw = sessionStorage.getItem(USER_KEY);
   if (!raw) return null;
 
   try {

@@ -1,8 +1,20 @@
 const Notice = require("../models/Notice");
+const { publishScheduledNotices } = require("../utils/scheduler");
+
+const getDisplayTitle = (noticeLike = {}) => {
+  const title = `${noticeLike.title || ""}`.trim();
+  if (title) return title;
+
+  const description = `${noticeLike.description || ""}`.trim();
+  if (!description) return "Notice";
+
+  return description.length > 60 ? `${description.slice(0, 60).trim()}...` : description;
+};
 
 const mapNotice = (notice) => ({
   id: notice._id,
-  title: notice.title,
+  rawTitle: `${notice.title || ""}`.trim(),
+  title: getDisplayTitle(notice),
   description: notice.description,
   attachmentUrl: notice.attachmentUrl,
   isImportant: notice.isImportant,
@@ -15,6 +27,8 @@ const mapNotice = (notice) => ({
 
 const getDashboardStats = async (req, res, next) => {
   try {
+    await publishScheduledNotices();
+
     const now = new Date();
     const [totalNotices, importantNotices, scheduledNotices, publishedNotices] = await Promise.all([
       Notice.countDocuments(),
@@ -38,6 +52,8 @@ const getDashboardStats = async (req, res, next) => {
 
 const getAdminNotices = async (req, res, next) => {
   try {
+    await publishScheduledNotices();
+
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 8, 1), 24);
     const search = req.query.search?.trim() || "";

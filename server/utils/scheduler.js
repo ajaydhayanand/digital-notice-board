@@ -20,7 +20,7 @@ const publishScheduledNotices = async () => {
 };
 
 const startScheduler = () => {
-  cron.schedule("* * * * *", async () => {
+  cron.schedule("*/10 * * * * *", async () => {
     try {
       await publishScheduledNotices();
     } catch (error) {

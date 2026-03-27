@@ -19,11 +19,15 @@ const router = express.Router();
 
 const adminOnly = authorizeRoles("admin");
 const noticeValidation = [
-  body("title").trim().isLength({ min: 3, max: 120 }).withMessage("Title must be between 3 and 120 characters"),
+  body("title")
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isLength({ max: 120 })
+    .withMessage("Title must be 120 characters or fewer"),
   body("description")
     .trim()
-    .isLength({ min: 10, max: 4000 })
-    .withMessage("Description must be between 10 and 4000 characters"),
+    .isLength({ min: 1, max: 4000 })
+    .withMessage("Message must be between 1 and 4000 characters"),
   body("attachmentUrl")
     .optional({ nullable: true, checkFalsy: true })
     .isLength({ max: 500 })

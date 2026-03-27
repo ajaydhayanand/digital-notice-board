@@ -70,7 +70,7 @@ function NoticeDetails() {
                 Important Notice
               </span>
             )}
-            <h1 className="mt-5 text-4xl font-semibold text-white">{notice.title}</h1>
+            <h1 className="mt-5 text-4xl font-semibold text-white">{notice.title || "Notice"}</h1>
             <p className="mt-4 text-sm text-slate-400">
               Published {new Date(notice.publishAt).toLocaleString()} by {notice.createdBy}
             </p>

@@ -1,15 +1,11 @@
 import React from "react";
-import { motion } from "framer-motion";
 import { Bookmark, BookmarkCheck, Clock3, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { resolveAttachmentUrl } from "../services/api";
 
 function NoticeCard({ notice, onBookmarkToggle, onReadToggle, compact = false }) {
   return (
-    <motion.article
-      layout
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.2 }}
+    <article
       className={`group relative overflow-hidden rounded-3xl border p-5 backdrop-blur-xl ${
         notice.isImportant
           ? "border-amber-300/50 bg-amber-200/10 shadow-glow animate-pulse-soft"
@@ -36,7 +32,7 @@ function NoticeCard({ notice, onBookmarkToggle, onReadToggle, compact = false })
                 </span>
               )}
             </div>
-            <h3 className="text-xl font-semibold text-white">{notice.title}</h3>
+            <h3 className="text-xl font-semibold text-white">{notice.title || "Notice"}</h3>
           </div>
 
           <button
@@ -86,7 +82,7 @@ function NoticeCard({ notice, onBookmarkToggle, onReadToggle, compact = false })
           )}
         </div>
       </div>
-    </motion.article>
+    </article>
   );
 }
 

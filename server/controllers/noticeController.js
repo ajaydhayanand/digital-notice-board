@@ -1,6 +1,31 @@
 const mongoose = require("mongoose");
 const Notice = require("../models/Notice");
 const User = require("../models/User");
+const { publishScheduledNotices } = require("../utils/scheduler");
+
+const getDisplayTitle = (noticeLike = {}) => {
+  const title = `${noticeLike.title || ""}`.trim();
+  if (title) return title;
+
+  const description = `${noticeLike.description || ""}`.trim();
+  if (!description) return "Notice";
+
+  return description.length > 60 ? `${description.slice(0, 60).trim()}...` : description;
+};
+
+const normalizeOptionalText = (value) => `${value || ""}`.trim();
+const normalizeRequiredMessage = (value) => `${value || ""}`.trim();
+
+const parsePublishAt = (value, fallback = new Date()) => {
+  if (!value) return fallback;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return fallback;
+  }
+
+  return parsed;
+};
 
 const buildVisibilityQuery = (user) => {
   if (user.role === "admin") {
@@ -19,7 +44,8 @@ const mapNotice = (notice, userDoc) => {
 
   return {
     id: notice._id,
-    title: notice.title,
+    rawTitle: `${notice.title || ""}`.trim(),
+    title: getDisplayTitle(notice),
     description: notice.description,
     attachmentUrl: notice.attachmentUrl,
     isImportant: notice.isImportant,
@@ -36,6 +62,8 @@ const mapNotice = (notice, userDoc) => {
 
 const getNotices = async (req, res, next) => {
   try {
+    await publishScheduledNotices();
+
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 6, 1), 24);
     const search = req.query.search?.trim() || "";
@@ -112,6 +140,8 @@ const getNotices = async (req, res, next) => {
 
 const getNoticeById = async (req, res, next) => {
   try {
+    await publishScheduledNotices();
+
     const notice = await Notice.findById(req.params.id).populate("createdBy", "username");
 
     if (!notice) {
@@ -144,12 +174,14 @@ const getNoticeById = async (req, res, next) => {
 
 const createNotice = async (req, res, next) => {
   try {
-    const publishAt = req.body.publishAt ? new Date(req.body.publishAt) : new Date();
+    const description = normalizeRequiredMessage(req.body.description);
+    const title = normalizeOptionalText(req.body.title);
+    const publishAt = parsePublishAt(req.body.publishAt, new Date());
     const isPublished = publishAt <= new Date();
 
     const notice = await Notice.create({
-      title: req.body.title,
-      description: req.body.description,
+      title,
+      description,
       attachmentUrl: req.body.attachmentUrl || "",
       isImportant: Boolean(req.body.isImportant),
       publishAt,
@@ -169,16 +201,20 @@ const createNotice = async (req, res, next) => {
 
 const updateNotice = async (req, res, next) => {
   try {
+    await publishScheduledNotices();
+
     const notice = await Notice.findById(req.params.id);
     if (!notice) {
       return res.status(404).json({ message: "Notice not found" });
     }
 
-    const publishAt = req.body.publishAt ? new Date(req.body.publishAt) : notice.publishAt;
+    const description = normalizeRequiredMessage(req.body.description);
+    const title = normalizeOptionalText(req.body.title);
+    const publishAt = parsePublishAt(req.body.publishAt, new Date());
     const isPublished = publishAt <= new Date();
 
-    notice.title = req.body.title;
-    notice.description = req.body.description;
+    notice.title = title;
+    notice.description = description;
     notice.attachmentUrl = req.body.attachmentUrl || "";
     notice.isImportant = Boolean(req.body.isImportant);
     notice.publishAt = publishAt;
