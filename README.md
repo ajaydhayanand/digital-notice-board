@@ -62,6 +62,8 @@ npm run dev
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:5000`
 
+If `MONGODB_URI` is omitted in local development, the backend falls back to an in-memory MongoDB instance so you can still launch the project quickly.
+
 ## Production Deployment
 
 ### Backend on Render or Railway
