@@ -1,254 +1,186 @@
-import React, { useCallback, useEffect, useState } from "react";
-import LoadingSpinner from "../components/LoadingSpinner";
+import React, { useEffect, useState } from "react";
+import { Search, Sparkles } from "lucide-react";
 import NoticeCard from "../components/NoticeCard";
-import { getNoticeCategories, getNotices } from "../services/api";
-import { getToken } from "../services/auth";
+import SkeletonCard from "../components/SkeletonCard";
+import { getNotices, markFeedSeen, toggleBookmark, toggleRead } from "../services/api";
+import { useToast } from "../components/ToastProvider";
 
-function NoticeList() {
-  const [notices, setNotices] = useState([]);
-  const [categories, setCategories] = useState([]);
+function NoticeList({ onMetaChange }) {
+  const { addToast } = useToast();
+  const [items, setItems] = useState([]);
+  const [meta, setMeta] = useState({ page: 1, totalPages: 1, newCount: 0, unreadCount: 0, bookmarkedCount: 0 });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [readStatus, setReadStatus] = useState("all");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    totalPages: 1,
-    hasNextPage: false,
-    hasPrevPage: false,
-    total: 0,
-  });
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setSearch(searchInput.trim());
+      setQuery(search.trim());
       setPage(1);
-    }, 350);
+    }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [searchInput]);
+  }, [search]);
 
-  const loadCategories = useCallback(async () => {
-    try {
-      const response = await getNoticeCategories();
-      setCategories(response.data?.data || []);
-    } catch (err) {
-      setCategories([]);
+  const loadNotices = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
     }
-  }, []);
 
-  const loadNotices = useCallback(
-    async ({ silent = false } = {}) => {
+    try {
+      const response = await getNotices({ search: query, filter, page, limit: 6 });
+      setItems(response.data.items || []);
+      setMeta(response.data.meta || {});
+      onMetaChange?.(response.data.meta || {});
       if (!silent) {
-        setLoading(true);
-        setError("");
+        markFeedSeen().catch(() => {});
       }
-
-      try {
-        const response = await getNotices({
-          search,
-          category,
-          readStatus,
-          page,
-          limit: 9,
-        });
-
-        if (Array.isArray(response.data)) {
-          setNotices(response.data);
-          setPagination({
-            page: 1,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPrevPage: false,
-            total: response.data.length,
-          });
-        } else {
-          setNotices(response.data?.data || []);
-          setPagination(
-            response.data?.pagination || {
-              page: 1,
-              totalPages: 1,
-              hasNextPage: false,
-              hasPrevPage: false,
-              total: 0,
-            }
-          );
-        }
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to fetch notices");
-      } finally {
-        if (!silent) {
-          setLoading(false);
-        }
-      }
-    },
-    [search, category, readStatus, page]
-  );
-
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Unable to load notices");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadNotices();
-  }, [loadNotices]);
+  }, [query, filter, page]);
 
-  useEffect(() => {
-    const token = getToken();
-    if (!token) return undefined;
+  const handleBookmark = async (id) => {
+    try {
+      const response = await toggleBookmark(id);
+      addToast({ type: "success", message: response.data.message });
+      await loadNotices({ silent: true });
+    } catch (requestError) {
+      addToast({ type: "error", message: requestError.response?.data?.message || "Bookmark update failed" });
+    }
+  };
 
-    const stream = new EventSource(`/api/notices/stream?token=${encodeURIComponent(token)}`);
-
-    stream.onmessage = async (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed?.type === "notice_changed") {
-          await loadNotices({ silent: true });
-          await loadCategories();
-        }
-      } catch (error) {
-        // Ignore malformed event payloads.
-      }
-    };
-
-    stream.onerror = () => {
-      // Browser will auto-reconnect for EventSource; no action needed here.
-    };
-
-    return () => stream.close();
-  }, [loadNotices, loadCategories]);
-
-  useEffect(() => {
-    // Fallback sync in case SSE is blocked by browser/proxy/network.
-    const noticeInterval = window.setInterval(() => {
-      loadNotices({ silent: true });
-    }, 4000);
-
-    const categoryInterval = window.setInterval(() => {
-      loadCategories();
-    }, 15000);
-
-    return () => {
-      window.clearInterval(noticeInterval);
-      window.clearInterval(categoryInterval);
-    };
-  }, [loadNotices, loadCategories]);
-
-  if (loading) {
-    return (
-      <section>
-        <h2 className="mb-4 text-2xl font-bold text-slate-900">Latest Notices</h2>
-        <div className="panel p-6">
-          <LoadingSpinner label="Loading notices..." />
-        </div>
-      </section>
-    );
-  }
-
-  if (error) {
-    return (
-      <section>
-        <h2 className="mb-4 text-2xl font-bold text-slate-900">Latest Notices</h2>
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{error}</div>
-      </section>
-    );
-  }
+  const handleRead = async (id, isRead) => {
+    try {
+      const response = await toggleRead(id, isRead);
+      addToast({ type: "success", message: response.data.message });
+      await loadNotices({ silent: true });
+    } catch (requestError) {
+      addToast({ type: "error", message: requestError.response?.data?.message || "Read status update failed" });
+    }
+  };
 
   return (
-    <section>
-      <div className="mb-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-800 to-cyan-700 p-6 text-white shadow-lg">
-        <h2 className="text-2xl font-bold sm:text-3xl">Latest Notices</h2>
-        <p className="mt-1 text-sm text-slate-100">Stay updated with announcements, events, and important updates.</p>
-      </div>
-
-      <div className="panel mb-5 grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search notices..."
-          className="input-base sm:col-span-2"
-        />
-        <select
-          value={category}
-          onChange={(e) => {
-            setCategory(e.target.value);
-            setPage(1);
-          }}
-          className="input-base"
-        >
-          <option value="">All categories</option>
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="mb-5 flex flex-wrap gap-2">
-        {[
-          { label: "All", value: "all" },
-          { label: "Unread", value: "unread" },
-          { label: "Read", value: "read" },
-        ].map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => {
-              setReadStatus(item.value);
-              setPage(1);
-            }}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-              readStatus === item.value
-                ? "bg-slate-900 text-white shadow"
-                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      {notices.length === 0 ? (
-        <div className="panel p-6 text-sm text-slate-600">No notices available.</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {notices.map((notice) => (
-            <NoticeCard key={notice._id} notice={notice} />
-          ))}
-        </div>
-      )}
-
-      {pagination.totalPages > 1 && (
-        <div className="panel mt-6 flex flex-wrap items-center justify-between gap-3 p-4">
-          <p className="text-sm text-slate-600">
-            Page {pagination.page} of {pagination.totalPages}
-            {typeof pagination.total === "number" ? ` (${pagination.total} total)` : ""}
+    <section className="space-y-8">
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.24),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,0.18),transparent_22%),rgba(2,6,23,0.72)] p-8">
+        <div className="relative z-10 max-w-3xl">
+          <p className="text-xs uppercase tracking-[0.4em] text-cyan-300">Student feed</p>
+          <h2 className="mt-4 text-4xl font-semibold text-white">Catch every update before it slips by.</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+            Browse announcements, bookmark the ones you care about, and spot important updates instantly with
+            glowing priority cards and fresh-notice badges.
           </p>
-          <div className="flex items-center gap-2">
+        </div>
+        <div className="absolute -right-6 top-6 hidden h-32 w-32 rounded-full bg-cyan-400/20 blur-3xl lg:block" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+        <label className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="input-base pl-11"
+            placeholder="Search notices, events, and circulars"
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
+          {[
+            { key: "all", label: "All" },
+            { key: "important", label: "Important" },
+            { key: "latest", label: "Latest" },
+            { key: "bookmarked", label: "Bookmarks" },
+          ].map((option) => (
             <button
+              key={option.key}
               type="button"
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={!pagination.hasPrevPage}
-              className="btn-secondary disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => {
+                setFilter(option.key);
+                setPage(1);
+              }}
+              className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                filter === option.key
+                  ? "border-cyan-300/60 bg-cyan-300 text-slate-950"
+                  : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+              }`}
             >
-              Previous
+              {option.label}
             </button>
-            <button
-              type="button"
-              onClick={() => setPage((prev) => prev + 1)}
-              disabled={!pagination.hasNextPage}
-              className="btn-primary disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Unread</p>
+          <p className="mt-3 text-4xl font-semibold text-white">{meta.unreadCount || 0}</p>
+        </div>
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Bookmarks</p>
+          <p className="mt-3 text-4xl font-semibold text-white">{meta.bookmarkedCount || 0}</p>
+        </div>
+        <div className="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5">
+          <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-amber-100">
+            <Sparkles className="h-4 w-4" />
+            New notices
+          </p>
+          <p className="mt-3 text-4xl font-semibold text-white">{meta.newCount || 0}</p>
+        </div>
+      </div>
+
+      {error && <div className="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">{error}</div>}
+
+      {loading ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <SkeletonCard key={index} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-slate-300">
+          No notices match your current filters.
+        </div>
+      ) : (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {items.map((notice) => (
+            <NoticeCard key={notice.id} notice={notice} onBookmarkToggle={handleBookmark} onReadToggle={handleRead} compact />
+          ))}
         </div>
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/5 p-4">
+        <p className="text-sm text-slate-300">
+          Page {meta.page || 1} of {meta.totalPages || 1}
+        </p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            disabled={(meta.page || 1) <= 1}
+            onClick={() => setPage((current) => Math.max(current - 1, 1))}
+            className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            disabled={(meta.page || 1) >= (meta.totalPages || 1)}
+            onClick={() => setPage((current) => current + 1)}
+            className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

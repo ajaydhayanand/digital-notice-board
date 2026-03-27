@@ -1,143 +1,110 @@
-const { pool } = require("../config/db");
-const { emitNoticeChanged, noticeEvents } = require("../utils/noticeEvents");
-const { logAudit } = require("../utils/audit");
-const { createNotificationLogsForNotice } = require("../utils/notifications");
+const mongoose = require("mongoose");
+const Notice = require("../models/Notice");
+const User = require("../models/User");
 
-const mapNotice = (row) => ({
-  _id: row.id,
-  id: row.id,
-  title: row.title,
-  description: row.description,
-  category: row.category,
-  createdBy: row.created_by,
-  isImportant: Boolean(row.is_important),
-  isRead: Boolean(row.is_read),
-  attachmentUrl: row.attachment_url || "",
-  publishAt: row.publish_at,
-  expiresAt: row.expires_at,
-  status: row.status,
-  createdAt: row.created_at,
-});
+const buildVisibilityQuery = (user) => {
+  if (user.role === "admin") {
+    return {};
+  }
 
-const privilegedRoles = new Set(["superadmin", "admin", "editor"]);
-const canSeeAllNotices = (user) => privilegedRoles.has(user.role);
-
-const syncNoticeStatuses = async () => {
-  await pool.execute(
-    "UPDATE notices SET status = 'archived' WHERE expires_at IS NOT NULL AND expires_at < NOW() AND status <> 'archived'"
-  );
-  await pool.execute(
-    "UPDATE notices SET status = 'scheduled' WHERE status <> 'archived' AND publish_at > NOW()"
-  );
-  await pool.execute(
-    "UPDATE notices SET status = 'published' WHERE status <> 'archived' AND publish_at <= NOW() AND (expires_at IS NULL OR expires_at >= NOW())"
-  );
+  return {
+    isPublished: true,
+    publishAt: { $lte: new Date() },
+  };
 };
 
-const getAllNotices = async (req, res, next) => {
+const mapNotice = (notice, userDoc) => {
+  const readSet = new Set((userDoc.readNotices || []).map((entry) => entry.notice.toString()));
+  const bookmarkSet = new Set((userDoc.bookmarkedNotices || []).map((id) => id.toString()));
+
+  return {
+    id: notice._id,
+    title: notice.title,
+    description: notice.description,
+    attachmentUrl: notice.attachmentUrl,
+    isImportant: notice.isImportant,
+    publishAt: notice.publishAt,
+    isPublished: notice.isPublished,
+    createdAt: notice.createdAt,
+    updatedAt: notice.updatedAt,
+    createdBy: notice.createdBy?.username || "admin",
+    isRead: readSet.has(notice._id.toString()),
+    isBookmarked: bookmarkSet.has(notice._id.toString()),
+    status: notice.isPublished ? "Published" : "Scheduled",
+  };
+};
+
+const getNotices = async (req, res, next) => {
   try {
-    await syncNoticeStatuses();
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 6, 1), 24);
+    const search = req.query.search?.trim() || "";
+    const filter = req.query.filter?.trim() || "all";
 
-    const search = (req.query.search || "").trim();
-    const category = (req.query.category || "").trim();
-    const readStatus = (req.query.readStatus || "").trim().toLowerCase();
-    const status = (req.query.status || "").trim().toLowerCase();
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 9, 1), 50);
-    const userId = req.user.id;
-    const includeAll = req.query.includeAll === "true" && canSeeAllNotices(req.user);
-
-    const where = [];
-    const params = [];
-
-    if (!includeAll) {
-      where.push("n.status = 'published'");
-      where.push("(n.expires_at IS NULL OR n.expires_at >= NOW())");
-      where.push("n.publish_at <= NOW()");
-    } else if (status && ["scheduled", "published", "archived"].includes(status)) {
-      where.push("n.status = ?");
-      params.push(status);
-    }
+    const baseQuery = buildVisibilityQuery(req.user);
+    const query = { ...baseQuery };
 
     if (search) {
-      where.push("(n.title LIKE ? OR n.description LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`);
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
     }
 
-    if (category) {
-      where.push("n.category = ?");
-      params.push(category);
+    if (filter === "important") {
+      query.isImportant = true;
     }
 
-    if (readStatus === "read") {
-      where.push("nr.user_id IS NOT NULL");
-    } else if (readStatus === "unread") {
-      where.push("nr.user_id IS NULL");
+    if (filter === "latest") {
+      query.isPublished = true;
+      query.publishAt = { $lte: new Date() };
     }
 
-    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
-    const offset = (page - 1) * limit;
+    if (filter === "bookmarked") {
+      query._id = { $in: req.userDoc.bookmarkedNotices || [] };
+    }
 
-    const [countRows] = await pool.query(
-      `SELECT COUNT(*) AS total
-       FROM notices n
-       LEFT JOIN notice_reads nr ON nr.notice_id = n.id AND nr.user_id = ?
-       ${whereClause}`,
-      [userId, ...params]
-    );
-    const total = countRows[0].total || 0;
+    if (filter === "unread") {
+      const readIds = (req.userDoc.readNotices || []).map((entry) => entry.notice);
+      query._id = {
+        $nin: readIds,
+      };
+    }
 
-    const [rows] = await pool.query(
-      `SELECT n.id, n.title, n.description, n.category, n.created_by, n.is_important, n.attachment_url, n.publish_at, n.expires_at, n.status, n.created_at,
-              CASE WHEN nr.user_id IS NULL THEN 0 ELSE 1 END AS is_read
-       FROM notices n
-       LEFT JOIN notice_reads nr ON nr.notice_id = n.id AND nr.user_id = ?
-       ${whereClause}
-       ORDER BY n.is_important DESC, n.created_at DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      [userId, ...params]
-    );
+    const total = await Notice.countDocuments(query);
+    const notices = await Notice.find(query)
+      .populate("createdBy", "username")
+      .sort({ isImportant: -1, publishAt: -1, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
 
-    const notices = rows.map(mapNotice);
+    const visibleQuery = {
+      isPublished: true,
+      publishAt: { $lte: new Date() },
+    };
+
+    const readIds = (req.userDoc.readNotices || []).map((entry) => entry.notice);
+    const newCount = await Notice.countDocuments({
+      ...visibleQuery,
+      publishAt: { $gt: req.userDoc.lastSeenAt || new Date(0), $lte: new Date() },
+    });
+    const unreadCount = await Notice.countDocuments({
+      ...visibleQuery,
+      _id: { $nin: readIds },
+    });
 
     return res.json({
-      data: notices,
-      pagination: {
+      items: notices.map((notice) => mapNotice(notice, req.userDoc)),
+      meta: {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit) || 1,
-        hasNextPage: page * limit < total,
-        hasPrevPage: page > 1,
-      },
-      filters: {
-        search,
-        category,
-        readStatus,
-        status,
+        totalPages: Math.max(Math.ceil(total / limit), 1),
+        newCount,
+        unreadCount,
+        bookmarkedCount: req.userDoc.bookmarkedNotices?.length || 0,
       },
     });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-const getNoticeCategories = async (req, res, next) => {
-  try {
-    await syncNoticeStatuses();
-    const includeAll = req.query.includeAll === "true" && canSeeAllNotices(req.user);
-    const visibilityWhere = includeAll
-      ? "1=1"
-      : "status = 'published' AND publish_at <= NOW() AND (expires_at IS NULL OR expires_at >= NOW())";
-
-    const [rows] = await pool.execute(
-      `SELECT DISTINCT category FROM notices
-       WHERE category IS NOT NULL AND category <> '' AND ${visibilityWhere}
-       ORDER BY category ASC`
-    );
-    const normalized = rows.map((row) => row.category);
-
-    return res.json({ data: normalized });
   } catch (error) {
     return next(error);
   }
@@ -145,43 +112,31 @@ const getNoticeCategories = async (req, res, next) => {
 
 const getNoticeById = async (req, res, next) => {
   try {
-    await syncNoticeStatuses();
+    const notice = await Notice.findById(req.params.id).populate("createdBy", "username");
 
-    const noticeId = Number(req.params.id);
-    if (!Number.isInteger(noticeId) || noticeId <= 0) {
-      return res.status(400).json({ message: "Invalid notice id" });
-    }
-
-    const [rows] = await pool.execute(
-      `SELECT n.id, n.title, n.description, n.category, n.created_by, n.is_important, n.attachment_url, n.publish_at, n.expires_at, n.status, n.created_at,
-              CASE WHEN nr.user_id IS NULL THEN 0 ELSE 1 END AS is_read
-       FROM notices n
-       LEFT JOIN notice_reads nr ON nr.notice_id = n.id AND nr.user_id = ?
-       WHERE n.id = ?
-       LIMIT 1`,
-      [req.user.id, noticeId]
-    );
-
-    if (!rows.length) {
+    if (!notice) {
       return res.status(404).json({ message: "Notice not found" });
     }
-    if (!canSeeAllNotices(req.user)) {
-      const notice = rows[0];
-      const isVisible =
-        notice.status === "published" &&
-        new Date(notice.publish_at).getTime() <= Date.now() &&
-        (!notice.expires_at || new Date(notice.expires_at).getTime() >= Date.now());
-      if (!isVisible) {
-        return res.status(404).json({ message: "Notice not found" });
-      }
+
+    if (req.user.role !== "admin" && (!notice.isPublished || notice.publishAt > new Date())) {
+      return res.status(404).json({ message: "Notice not found" });
     }
 
-    await pool.execute(
-      "INSERT INTO notice_reads (user_id, notice_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE read_at = CURRENT_TIMESTAMP",
-      [req.user.id, noticeId]
+    const hasRead = (req.userDoc.readNotices || []).some(
+      (entry) => entry.notice.toString() === notice._id.toString()
     );
 
-    return res.json({ ...mapNotice(rows[0]), isRead: true });
+    if (!hasRead) {
+      req.userDoc.readNotices.push({
+        notice: notice._id,
+        readAt: new Date(),
+      });
+      await req.userDoc.save();
+    }
+
+    return res.json({
+      notice: mapNotice(notice, req.userDoc),
+    });
   } catch (error) {
     return next(error);
   }
@@ -189,58 +144,24 @@ const getNoticeById = async (req, res, next) => {
 
 const createNotice = async (req, res, next) => {
   try {
-    const { title, description, category, isImportant, attachmentUrl, publishAt, expiresAt } = req.body;
-    const createdBy = req.user.username;
-    const publishAtValue = publishAt ? new Date(publishAt) : new Date();
-    const expiresAtValue = expiresAt ? new Date(expiresAt) : null;
+    const publishAt = req.body.publishAt ? new Date(req.body.publishAt) : new Date();
+    const isPublished = publishAt <= new Date();
 
-    if (expiresAtValue && publishAtValue.getTime() > expiresAtValue.getTime()) {
-      return res.status(400).json({ message: "Expiry date must be after publish date" });
-    }
-
-    const status = publishAtValue.getTime() > Date.now() ? "scheduled" : "published";
-
-    const [result] = await pool.execute(
-      `INSERT INTO notices
-      (title, description, category, created_by, is_important, attachment_url, publish_at, expires_at, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        title,
-        description,
-        category,
-        createdBy,
-        isImportant ? 1 : 0,
-        attachmentUrl || null,
-        publishAtValue,
-        expiresAtValue,
-        status,
-      ]
-    );
-
-    const [rows] = await pool.execute(
-      "SELECT id, title, description, category, created_by, is_important, attachment_url, publish_at, expires_at, status, created_at, 0 AS is_read FROM notices WHERE id = ? LIMIT 1",
-      [result.insertId]
-    );
-
-    const created = mapNotice(rows[0]);
-    await logAudit({
-      user: req.user,
-      action: "notice_created",
-      entityType: "notice",
-      entityId: created.id,
-      details: { title: created.title, category: created.category, isImportant: created.isImportant },
+    const notice = await Notice.create({
+      title: req.body.title,
+      description: req.body.description,
+      attachmentUrl: req.body.attachmentUrl || "",
+      isImportant: Boolean(req.body.isImportant),
+      publishAt,
+      isPublished,
+      createdBy: req.user.id,
     });
 
-    if (created.isImportant) {
-      await createNotificationLogsForNotice(created.id, {
-        title: created.title,
-        category: created.category,
-        important: true,
-      });
-    }
+    const populated = await Notice.findById(notice._id).populate("createdBy", "username");
 
-    emitNoticeChanged({ action: "created", noticeId: created.id });
-    return res.status(201).json(created);
+    return res.status(201).json({
+      notice: mapNotice(populated, req.userDoc),
+    });
   } catch (error) {
     return next(error);
   }
@@ -248,67 +169,27 @@ const createNotice = async (req, res, next) => {
 
 const updateNotice = async (req, res, next) => {
   try {
-    const noticeId = Number(req.params.id);
-    if (!Number.isInteger(noticeId) || noticeId <= 0) {
-      return res.status(400).json({ message: "Invalid notice id" });
-    }
-
-    const { title, description, category, isImportant, attachmentUrl, publishAt, expiresAt } = req.body;
-    const publishAtValue = publishAt ? new Date(publishAt) : new Date();
-    const expiresAtValue = expiresAt ? new Date(expiresAt) : null;
-
-    if (expiresAtValue && publishAtValue.getTime() > expiresAtValue.getTime()) {
-      return res.status(400).json({ message: "Expiry date must be after publish date" });
-    }
-    const status = publishAtValue.getTime() > Date.now() ? "scheduled" : "published";
-
-    const [existing] = await pool.execute("SELECT id FROM notices WHERE id = ? LIMIT 1", [noticeId]);
-    if (!existing.length) {
+    const notice = await Notice.findById(req.params.id);
+    if (!notice) {
       return res.status(404).json({ message: "Notice not found" });
     }
 
-    await pool.execute(
-      `UPDATE notices
-       SET title = ?, description = ?, category = ?, is_important = ?, attachment_url = ?, publish_at = ?, expires_at = ?, status = ?
-       WHERE id = ?`,
-      [
-        title,
-        description,
-        category,
-        isImportant ? 1 : 0,
-        attachmentUrl || null,
-        publishAtValue,
-        expiresAtValue,
-        status,
-        noticeId,
-      ]
-    );
+    const publishAt = req.body.publishAt ? new Date(req.body.publishAt) : notice.publishAt;
+    const isPublished = publishAt <= new Date();
 
-    const [rows] = await pool.execute(
-      "SELECT id, title, description, category, created_by, is_important, attachment_url, publish_at, expires_at, status, created_at, 0 AS is_read FROM notices WHERE id = ? LIMIT 1",
-      [noticeId]
-    );
+    notice.title = req.body.title;
+    notice.description = req.body.description;
+    notice.attachmentUrl = req.body.attachmentUrl || "";
+    notice.isImportant = Boolean(req.body.isImportant);
+    notice.publishAt = publishAt;
+    notice.isPublished = isPublished;
+    await notice.save();
 
-    const updated = mapNotice(rows[0]);
-    await logAudit({
-      user: req.user,
-      action: "notice_updated",
-      entityType: "notice",
-      entityId: updated.id,
-      details: { title: updated.title, category: updated.category, isImportant: updated.isImportant },
+    const populated = await Notice.findById(notice._id).populate("createdBy", "username");
+
+    return res.json({
+      notice: mapNotice(populated, req.userDoc),
     });
-
-    if (updated.isImportant) {
-      await createNotificationLogsForNotice(updated.id, {
-        title: updated.title,
-        category: updated.category,
-        important: true,
-        source: "update",
-      });
-    }
-
-    emitNoticeChanged({ action: "updated", noticeId: updated.id });
-    return res.json(updated);
   } catch (error) {
     return next(error);
   }
@@ -316,167 +197,133 @@ const updateNotice = async (req, res, next) => {
 
 const deleteNotice = async (req, res, next) => {
   try {
-    const noticeId = Number(req.params.id);
-    if (!Number.isInteger(noticeId) || noticeId <= 0) {
-      return res.status(400).json({ message: "Invalid notice id" });
-    }
+    const notice = await Notice.findById(req.params.id);
 
-    const [result] = await pool.execute("DELETE FROM notices WHERE id = ?", [noticeId]);
-    if (!result.affectedRows) {
+    if (!notice) {
       return res.status(404).json({ message: "Notice not found" });
     }
 
-    await logAudit({
-      user: req.user,
-      action: "notice_deleted",
-      entityType: "notice",
-      entityId: noticeId,
-    });
+    await Notice.findByIdAndDelete(req.params.id);
+    await User.updateMany(
+      {},
+      {
+        $pull: {
+          bookmarkedNotices: notice._id,
+          readNotices: { notice: notice._id },
+        },
+      }
+    );
 
-    emitNoticeChanged({ action: "deleted", noticeId });
     return res.json({ message: "Notice deleted successfully" });
   } catch (error) {
     return next(error);
   }
 };
 
-const updateReadStatus = async (req, res, next) => {
+const toggleImportant = async (req, res, next) => {
   try {
-    const noticeId = Number(req.params.id);
-    const { isRead } = req.body;
-
-    if (!Number.isInteger(noticeId) || noticeId <= 0) {
-      return res.status(400).json({ message: "Invalid notice id" });
-    }
-
-    if (typeof isRead !== "boolean") {
-      return res.status(400).json({ message: "isRead must be boolean" });
-    }
-
-    const [exists] = await pool.execute("SELECT id FROM notices WHERE id = ? LIMIT 1", [noticeId]);
-    if (!exists.length) {
+    const notice = await Notice.findById(req.params.id);
+    if (!notice) {
       return res.status(404).json({ message: "Notice not found" });
     }
 
-    if (isRead) {
-      await pool.execute(
-        "INSERT INTO notice_reads (user_id, notice_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE read_at = CURRENT_TIMESTAMP",
-        [req.user.id, noticeId]
+    notice.isImportant = Boolean(req.body.isImportant);
+    await notice.save();
+
+    return res.json({
+      message: notice.isImportant ? "Notice marked important" : "Notice importance removed",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const toggleBookmark = async (req, res, next) => {
+  try {
+    const notice = await Notice.findById(req.params.id).select("_id");
+    if (!notice) {
+      return res.status(404).json({ message: "Notice not found" });
+    }
+
+    const noticeId = new mongoose.Types.ObjectId(req.params.id);
+    const bookmarkedIds = new Set((req.userDoc.bookmarkedNotices || []).map((id) => id.toString()));
+    const isBookmarked = bookmarkedIds.has(noticeId.toString());
+
+    if (isBookmarked) {
+      req.userDoc.bookmarkedNotices = req.userDoc.bookmarkedNotices.filter(
+        (id) => id.toString() !== noticeId.toString()
       );
     } else {
-      await pool.execute("DELETE FROM notice_reads WHERE user_id = ? AND notice_id = ?", [
-        req.user.id,
-        noticeId,
-      ]);
+      req.userDoc.bookmarkedNotices.push(noticeId);
     }
 
-    await logAudit({
-      user: req.user,
-      action: isRead ? "notice_mark_read" : "notice_mark_unread",
-      entityType: "notice",
-      entityId: noticeId,
-    });
+    await req.userDoc.save();
 
-    return res.json({ message: "Read status updated", isRead });
+    return res.json({
+      message: isBookmarked ? "Removed from bookmarks" : "Added to bookmarks",
+      isBookmarked: !isBookmarked,
+    });
   } catch (error) {
     return next(error);
   }
 };
 
-const updateImportantStatus = async (req, res, next) => {
+const toggleRead = async (req, res, next) => {
   try {
-    const noticeId = Number(req.params.id);
-    const { isImportant } = req.body;
-
-    if (!Number.isInteger(noticeId) || noticeId <= 0) {
-      return res.status(400).json({ message: "Invalid notice id" });
-    }
-
-    if (typeof isImportant !== "boolean") {
-      return res.status(400).json({ message: "isImportant must be boolean" });
-    }
-
-    const [result] = await pool.execute(
-      "UPDATE notices SET is_important = ? WHERE id = ?",
-      [isImportant ? 1 : 0, noticeId]
-    );
-
-    if (!result.affectedRows) {
+    const noticeId = req.params.id;
+    const notice = await Notice.findById(noticeId).select("_id");
+    if (!notice) {
       return res.status(404).json({ message: "Notice not found" });
     }
 
-    await logAudit({
-      user: req.user,
-      action: isImportant ? "notice_marked_important" : "notice_unmarked_important",
-      entityType: "notice",
-      entityId: noticeId,
-    });
+    const shouldMarkRead = Boolean(req.body.isRead);
+    const hasRead = (req.userDoc.readNotices || []).some(
+      (entry) => entry.notice.toString() === noticeId
+    );
 
-    if (isImportant) {
-      const [[notice]] = await pool.execute(
-        "SELECT id, title, category FROM notices WHERE id = ? LIMIT 1",
-        [noticeId]
-      );
-      if (notice) {
-        await createNotificationLogsForNotice(noticeId, {
-          title: notice.title,
-          category: notice.category,
-          important: true,
-          source: "important_toggle",
-        });
-      }
+    if (shouldMarkRead && !hasRead) {
+      req.userDoc.readNotices.push({
+        notice: noticeId,
+        readAt: new Date(),
+      });
     }
 
-    emitNoticeChanged({ action: "important_changed", noticeId, isImportant });
-    return res.json({ message: "Important status updated", isImportant });
+    if (!shouldMarkRead && hasRead) {
+      req.userDoc.readNotices = req.userDoc.readNotices.filter(
+        (entry) => entry.notice.toString() !== noticeId
+      );
+    }
+
+    await req.userDoc.save();
+
+    return res.json({
+      message: shouldMarkRead ? "Marked as read" : "Marked as unread",
+      isRead: shouldMarkRead,
+    });
   } catch (error) {
     return next(error);
   }
 };
 
-const streamNoticeEvents = async (req, res, next) => {
+const markFeedSeen = async (req, res, next) => {
   try {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("Connection", "keep-alive");
-    if (typeof res.flushHeaders === "function") {
-      res.flushHeaders();
-    }
+    req.userDoc.lastSeenAt = new Date();
+    await req.userDoc.save();
 
-    const send = (payload) => {
-      res.write(`data: ${JSON.stringify(payload)}\n\n`);
-    };
-
-    send({ type: "connected" });
-
-    const onChanged = (payload) => {
-      send({ type: "notice_changed", payload });
-    };
-
-    noticeEvents.on("notice:changed", onChanged);
-
-    const keepAlive = setInterval(() => {
-      res.write(": ping\n\n");
-    }, 25000);
-
-    req.on("close", () => {
-      clearInterval(keepAlive);
-      noticeEvents.off("notice:changed", onChanged);
-      res.end();
-    });
+    return res.json({ message: "Feed seen" });
   } catch (error) {
     return next(error);
   }
 };
 
 module.exports = {
-  getAllNotices,
-  getNoticeCategories,
+  getNotices,
   getNoticeById,
   createNotice,
   updateNotice,
   deleteNotice,
-  updateReadStatus,
-  updateImportantStatus,
-  streamNoticeEvents,
+  toggleImportant,
+  toggleBookmark,
+  toggleRead,
+  markFeedSeen,
 };

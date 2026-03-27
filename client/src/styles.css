@@ -4,37 +4,28 @@
 
 @layer base {
   body {
-    @apply min-h-screen bg-slate-100 text-slate-800;
-    background-image:
-      radial-gradient(circle at 10% 15%, rgba(56, 189, 248, 0.16), transparent 35%),
-      radial-gradient(circle at 85% 20%, rgba(99, 102, 241, 0.12), transparent 30%),
-      radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.12), transparent 28%);
-    background-attachment: fixed;
+    @apply min-h-screen bg-slate-950 text-slate-100 antialiased transition-colors duration-300;
+  }
+
+  #root {
+    @apply min-h-screen;
   }
 }
 
 @layer components {
-  .panel {
-    @apply rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm backdrop-blur;
+  .input-base {
+    @apply w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20;
   }
 
   .btn-primary {
-    @apply inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-slate-700;
+    @apply inline-flex items-center gap-2 rounded-full bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-200;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50;
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10;
   }
 
   .btn-danger {
-    @apply inline-flex items-center rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-500;
-  }
-
-  .input-base {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring-2;
-  }
-
-  .chip {
-    @apply rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide;
+    @apply inline-flex items-center gap-2 rounded-full bg-rose-400 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-rose-300;
   }
 }

@@ -1,149 +1,85 @@
 import React, { useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
 import NoticeList from "./pages/NoticeList";
 import NoticeDetails from "./pages/NoticeDetails";
 import AdminDashboard from "./pages/AdminDashboard";
-import CreateNoticeForm from "./pages/CreateNoticeForm";
-import LoginPage from "./pages/LoginPage";
-import AdminInsights from "./pages/AdminInsights";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ToastProvider } from "./components/ToastProvider";
-import {
-  AUTH_CHANGED_EVENT,
-  canManageNotices,
-  getCurrentUser,
-  isAdmin,
-  isAuthenticated,
-  logout,
-} from "./services/auth";
+import Sidebar from "./components/Sidebar";
+import { AUTH_CHANGED_EVENT, getCurrentUser, getStoredTheme, isAuthenticated, saveTheme } from "./services/auth";
 
-function App() {
-  const [authState, setAuthState] = useState({
-    authenticated: isAuthenticated(),
-    user: getCurrentUser(),
-    admin: isAdmin(),
-    manager: canManageNotices(),
-  });
+function AppShell() {
+  const [theme, setTheme] = useState(getStoredTheme());
+  const [user, setUser] = useState(getCurrentUser());
+  const [feedMeta, setFeedMeta] = useState({ newCount: 0 });
 
   useEffect(() => {
-    const syncAuthState = () => {
-      setAuthState({
-        authenticated: isAuthenticated(),
-        user: getCurrentUser(),
-        admin: isAdmin(),
-        manager: canManageNotices(),
-      });
-    };
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    saveTheme(theme);
+  }, [theme]);
 
-    window.addEventListener(AUTH_CHANGED_EVENT, syncAuthState);
-    return () => window.removeEventListener(AUTH_CHANGED_EVENT, syncAuthState);
+  useEffect(() => {
+    const sync = () => setUser(getCurrentUser());
+    window.addEventListener(AUTH_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, sync);
   }, []);
 
-  const { authenticated, user: currentUser, admin, manager } = authState;
+  if (!isAuthenticated()) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
 
   return (
-    <ToastProvider>
-      <div className="min-h-screen">
-        <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/75 backdrop-blur-md">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="bg-gradient-to-r from-slate-900 via-indigo-700 to-cyan-600 bg-clip-text text-xl font-extrabold tracking-tight text-transparent">
-              Digital Notice Board
-            </h1>
-            <nav className="flex flex-wrap items-center gap-2">
-              <Link
-                to="/"
-                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-              >
-                Notices
-              </Link>
-              {admin && (
-                <Link
-                  to={manager ? "/admin" : "/admin/insights"}
-                  className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                >
-                  Admin Dashboard
-                </Link>
-              )}
-              {admin && (
-                <Link
-                  to="/admin/insights"
-                  className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                >
-                  Insights
-                </Link>
-              )}
-              {authenticated && (
-                <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">
-                  {currentUser?.role || "user"}
-                </span>
-              )}
-              {!authenticated ? (
-                <Link
-                  to="/login"
-                  className="btn-primary"
-                >
-                  Login
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="btn-danger"
-                >
-                  Logout
-                </button>
-              )}
-            </nav>
-          </div>
-        </header>
+    <div className="min-h-screen bg-transparent px-4 py-4 sm:px-6 lg:px-8">
+      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1600px] gap-6 lg:grid-cols-[18rem_1fr]">
+        <Sidebar
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          newCount={feedMeta.newCount || 0}
+        />
 
-        <main className="mx-auto w-full max-w-6xl px-4 py-8">
+        <main className="rounded-[2rem] border border-white/10 bg-slate-950/55 p-5 shadow-2xl shadow-slate-950/30 backdrop-blur-xl sm:p-8">
+          <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.32em] text-slate-400">Welcome back</p>
+              <h2 className="mt-2 text-3xl font-semibold text-white">
+                {user?.role === "admin" ? "Administrator Control Room" : "Your Notice Feed"}
+              </h2>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">
+              Signed in as <span className="font-semibold text-white">{user?.username}</span>
+            </div>
+          </header>
+
           <Routes>
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute allowedRoles={["student", "viewer", "editor", "admin", "superadmin"]}>
-                  <NoticeList />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notices/:id"
-              element={
-                <ProtectedRoute allowedRoles={["student", "viewer", "editor", "admin", "superadmin"]}>
-                  <NoticeDetails />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<NoticeList onMetaChange={setFeedMeta} />} />
+            <Route path="/notices/:id" element={<NoticeDetails />} />
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={["editor", "admin", "superadmin"]}>
+                <ProtectedRoute requireAdmin>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/insights"
-              element={
-                <ProtectedRoute allowedRoles={["viewer", "editor", "admin", "superadmin"]}>
-                  <AdminInsights />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/create"
-              element={
-                <ProtectedRoute allowedRoles={["editor", "admin", "superadmin"]}>
-                  <CreateNoticeForm />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <ToastProvider>
+      <AppShell />
     </ToastProvider>
   );
 }

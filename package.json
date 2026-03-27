@@ -1,19 +1,27 @@
 {
   "name": "digital-notice-board",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "Production-ready digital notice board with role-based auth, scheduling, bookmarks, and premium UI.",
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"npm run dev -w server\" \"npm run start -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm run start -w server"
   },
-  "keywords": [],
+  "keywords": [
+    "react",
+    "express",
+    "mongodb",
+    "jwt",
+    "tailwind"
+  ],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "body-parser": "^2.2.2",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "mysql2": "^3.16.2"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }

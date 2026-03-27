@@ -1,46 +1,57 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { pool } = require("../config/db");
+const User = require("../models/User");
 
-const login = async (req, res) => {
+const createToken = (user) =>
+  jwt.sign(
+    {
+      id: user._id,
+      username: user.username,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    }
+  );
+
+const login = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const username = req.body.username?.trim().toLowerCase();
+    const { password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ message: "Username and password are required" });
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    const [rows] = await pool.execute(
-      "SELECT id, username, password_hash, role FROM users WHERE username = ? LIMIT 1",
-      [username]
-    );
-
-    if (!rows.length) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const user = rows[0];
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "Invalid username or password" });
     }
 
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
-    );
+    const token = createToken(user);
 
     return res.json({
       token,
-      user: { id: user.id, username: user.username, role: user.role },
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role,
+      },
     });
   } catch (error) {
-    return res.status(500).json({ message: "Login failed" });
+    return next(error);
   }
+};
+
+const me = async (req, res) => {
+  return res.json({
+    user: req.user,
+  });
 };
 
 module.exports = {
   login,
+  me,
 };

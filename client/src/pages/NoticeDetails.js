@@ -1,122 +1,109 @@
 import React, { useEffect, useState } from "react";
+import { ArrowLeft, Bookmark, BookmarkCheck } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { getNoticeById, resolveAttachmentUrl, toggleBookmark, toggleRead } from "../services/api";
 import { useToast } from "../components/ToastProvider";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { getNoticeById, resolveAttachmentUrl, updateReadStatus } from "../services/api";
 
 function NoticeDetails() {
-  const { addToast } = useToast();
   const { id } = useParams();
-  const navigate = useNavigate();
+  const { addToast } = useToast();
   const [notice, setNotice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const loadNotice = async () => {
-      try {
-        const response = await getNoticeById(id);
-        setNotice(response.data);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to fetch notice details");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadNotice();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="panel p-6">
-        <LoadingSpinner label="Loading notice details..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{error}</div>;
-  }
-
-  if (!notice) {
-    return <div className="panel p-6 text-sm text-slate-600">Notice not found.</div>;
-  }
-
-  const handleReadToggle = async () => {
+  const loadNotice = async () => {
     try {
-      const nextStatus = !notice.isRead;
-      await updateReadStatus(id, nextStatus);
-      setNotice((prev) => ({ ...prev, isRead: nextStatus }));
-      addToast({
-        type: "success",
-        message: nextStatus ? "Marked as read" : "Marked as unread",
-      });
-    } catch (err) {
-      addToast({
-        type: "error",
-        message: err.response?.data?.message || "Failed to update read status",
-      });
+      setLoading(true);
+      const response = await getNoticeById(id);
+      setNotice(response.data.notice);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Unable to load notice");
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="btn-secondary"
-        >
-          Back
-        </button>
-        <Link to="/" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-          All notices
-        </Link>
-      </div>
+  useEffect(() => {
+    loadNotice();
+  }, [id]);
 
-      <article className="panel p-6">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">{notice.category}</p>
-          {notice.isImportant && (
-            <span className="chip bg-amber-100 text-amber-700">
-              Important
-            </span>
+  const handleBookmark = async () => {
+    try {
+      const response = await toggleBookmark(id);
+      addToast({ type: "success", message: response.data.message });
+      await loadNotice();
+    } catch (requestError) {
+      addToast({ type: "error", message: requestError.response?.data?.message || "Bookmark update failed" });
+    }
+  };
+
+  const handleReadToggle = async () => {
+    try {
+      const response = await toggleRead(id, !notice.isRead);
+      addToast({ type: "success", message: response.data.message });
+      await loadNotice();
+    } catch (requestError) {
+      addToast({ type: "error", message: requestError.response?.data?.message || "Read status update failed" });
+    }
+  };
+
+  if (loading) return <LoadingSpinner label="Loading notice details..." />;
+
+  if (error) {
+    return <div className="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">{error}</div>;
+  }
+
+  return (
+    <section className="space-y-6">
+      <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-cyan-200 hover:text-cyan-100">
+        <ArrowLeft className="h-4 w-4" />
+        Back to notices
+      </Link>
+
+      <article className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_28%),rgba(15,23,42,0.8)] p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            {notice.isImportant && (
+              <span className="inline-flex rounded-full border border-amber-300/40 bg-amber-300/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-amber-100">
+                Important Notice
+              </span>
+            )}
+            <h1 className="mt-5 text-4xl font-semibold text-white">{notice.title}</h1>
+            <p className="mt-4 text-sm text-slate-400">
+              Published {new Date(notice.publishAt).toLocaleString()} by {notice.createdBy}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleBookmark}
+            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-white transition hover:bg-white/10"
+          >
+            {notice.isBookmarked ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
+          </button>
+        </div>
+
+        <div className="mt-8 rounded-3xl border border-white/10 bg-black/20 p-6 text-base leading-8 text-slate-200">
+          {notice.description}
+        </div>
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          <button type="button" onClick={handleReadToggle} className="btn-secondary">
+            Mark as {notice.isRead ? "Unread" : "Read"}
+          </button>
+          {notice.attachmentUrl && (
+            <a
+              href={resolveAttachmentUrl(notice.attachmentUrl)}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary"
+            >
+              Open Attachment
+            </a>
           )}
-          <span
-            className={`chip ${
-              notice.isRead ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-            }`}
-          >
-            {notice.isRead ? "Read" : "Unread"}
-          </span>
         </div>
-        <h2 className="mb-4 text-2xl font-bold text-slate-900">{notice.title}</h2>
-        <p className="whitespace-pre-wrap leading-7 text-slate-700">{notice.description}</p>
-        {notice.attachmentUrl && (
-          <a
-            href={resolveAttachmentUrl(notice.attachmentUrl)}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-4 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-500"
-          >
-            Open attachment
-          </a>
-        )}
-        <div className="mt-6 grid gap-1 text-xs text-slate-500 sm:text-sm">
-          <p>Created by: {notice.createdBy || "admin"}</p>
-          <p>Status: {notice.status || "published"}</p>
-          <p>Publish at: {notice.publishAt ? new Date(notice.publishAt).toLocaleString() : "-"}</p>
-          {notice.expiresAt && <p>Expires at: {new Date(notice.expiresAt).toLocaleString()}</p>}
-          <p>Created at: {new Date(notice.createdAt).toLocaleString()}</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleReadToggle}
-          className="btn-secondary mt-5"
-        >
-          Mark as {notice.isRead ? "Unread" : "Read"}
-        </button>
       </article>
     </section>
   );

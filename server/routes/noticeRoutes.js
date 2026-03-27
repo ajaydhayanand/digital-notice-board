@@ -1,60 +1,72 @@
 const express = require("express");
 const { body, param } = require("express-validator");
 const {
-  getAllNotices,
-  getNoticeCategories,
+  getNotices,
   getNoticeById,
   createNotice,
   updateNotice,
   deleteNotice,
-  updateReadStatus,
-  updateImportantStatus,
-  streamNoticeEvents,
+  toggleImportant,
+  toggleBookmark,
+  toggleRead,
+  markFeedSeen,
 } = require("../controllers/noticeController");
 const authMiddleware = require("../middleware/authMiddleware");
-const requireAdmin = require("../middleware/requireAdmin");
+const authorizeRoles = require("../middleware/authorizeRoles");
 const validate = require("../middleware/validate");
 
 const router = express.Router();
 
+const adminOnly = authorizeRoles("admin");
 const noticeValidation = [
-  body("title").trim().isLength({ min: 3, max: 120 }).withMessage("Title must be 3-120 characters"),
+  body("title").trim().isLength({ min: 3, max: 120 }).withMessage("Title must be between 3 and 120 characters"),
   body("description")
     .trim()
-    .isLength({ min: 5, max: 2000 })
-    .withMessage("Description must be 5-2000 characters"),
-  body("category").trim().isLength({ min: 2, max: 60 }).withMessage("Category must be 2-60 characters"),
+    .isLength({ min: 10, max: 4000 })
+    .withMessage("Description must be between 10 and 4000 characters"),
+  body("attachmentUrl")
+    .optional({ nullable: true, checkFalsy: true })
+    .isLength({ max: 500 })
+    .withMessage("Attachment URL is too long"),
   body("isImportant").optional().isBoolean().withMessage("isImportant must be boolean"),
-  body("attachmentUrl").optional({ nullable: true, checkFalsy: true }).isLength({ max: 500 }).withMessage("attachmentUrl too long"),
   body("publishAt").optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage("publishAt must be a valid date"),
-  body("expiresAt").optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage("expiresAt must be a valid date"),
 ];
 
-const idValidation = [param("id").isInt({ min: 1 }).withMessage("Invalid notice id")];
+router.use(authMiddleware);
 
-router.get("/", authMiddleware, getAllNotices);
-router.get("/categories", authMiddleware, getNoticeCategories);
-router.get("/stream", authMiddleware, streamNoticeEvents);
-router.get("/:id", authMiddleware, idValidation, validate, getNoticeById);
-router.post("/", authMiddleware, requireAdmin, noticeValidation, validate, createNotice);
-router.put("/:id", authMiddleware, requireAdmin, idValidation, noticeValidation, validate, updateNotice);
-router.delete("/:id", authMiddleware, requireAdmin, idValidation, validate, deleteNotice);
-router.patch(
-  "/:id/read-status",
-  authMiddleware,
-  idValidation,
-  body("isRead").isBoolean().withMessage("isRead must be boolean"),
+router.get("/", getNotices);
+router.get("/:id", param("id").isMongoId().withMessage("Invalid notice id"), validate, getNoticeById);
+router.post("/", adminOnly, noticeValidation, validate, createNotice);
+router.put(
+  "/:id",
+  adminOnly,
+  param("id").isMongoId().withMessage("Invalid notice id"),
+  noticeValidation,
   validate,
-  updateReadStatus
+  updateNotice
 );
+router.delete("/:id", adminOnly, param("id").isMongoId().withMessage("Invalid notice id"), validate, deleteNotice);
 router.patch(
   "/:id/important",
-  authMiddleware,
-  requireAdmin,
-  idValidation,
+  adminOnly,
+  param("id").isMongoId().withMessage("Invalid notice id"),
   body("isImportant").isBoolean().withMessage("isImportant must be boolean"),
   validate,
-  updateImportantStatus
+  toggleImportant
 );
+router.patch(
+  "/:id/bookmark",
+  param("id").isMongoId().withMessage("Invalid notice id"),
+  validate,
+  toggleBookmark
+);
+router.patch(
+  "/:id/read",
+  param("id").isMongoId().withMessage("Invalid notice id"),
+  body("isRead").isBoolean().withMessage("isRead must be boolean"),
+  validate,
+  toggleRead
+);
+router.post("/feed/seen", markFeedSeen);
 
 module.exports = router;

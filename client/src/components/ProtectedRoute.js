@@ -1,20 +1,17 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
-import { getUserRole, isAuthenticated } from "../services/auth";
+import { Navigate, useLocation } from "react-router-dom";
+import { getCurrentUser, isAuthenticated } from "../services/auth";
 
-function ProtectedRoute({ children, allowedRoles = [] }) {
+function ProtectedRoute({ children, requireAdmin = false }) {
+  const location = useLocation();
+  const user = getCurrentUser();
+
   if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (allowedRoles.length > 0) {
-    const role = getUserRole();
-    if (!role) {
-      return <Navigate to="/login" replace />;
-    }
-    if (!allowedRoles.includes(role)) {
-      return <Navigate to="/" replace />;
-    }
+  if (requireAdmin && user?.role !== "admin") {
+    return <Navigate to="/" replace />;
   }
 
   return children;

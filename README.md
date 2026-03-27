@@ -1,69 +1,126 @@
 # Digital Notice Board
 
-Full-stack web app for publishing and viewing institutional notices.
+Digital Notice Board is a premium full-stack notice management platform built for campuses, hackathons, and placement-ready demos. It includes JWT authentication, admin/user role separation, scheduled publishing, bookmarks, read tracking, a modern animated React UI, and a MongoDB-backed Express API.
 
-## Stack
-- Frontend: React + TailwindCSS
-- Backend: Node.js + Express
-- Database: MySQL
-- Auth: JWT (admin-protected write APIs)
+## Tech Stack
 
-## Project Structure
-- `client/` React frontend
-- `server/` Express API + MySQL queries
-- `server/sql/schema.sql` database bootstrap script
+- Frontend: React, Tailwind CSS, Framer Motion
+- Backend: Node.js, Express
+- Database: MongoDB Atlas or local MongoDB with Mongoose
+- Auth: JWT
+- File uploads: Multer
+- Scheduling: node-cron
+- Deployment targets: Vercel (frontend), Render/Railway (backend), MongoDB Atlas (database)
 
-## Setup
-### 1) Database
-Run the SQL script:
+## Demo Credentials
 
-```sql
-SOURCE server/sql/schema.sql;
-```
+- Admin
+  - `username`: `admin`
+  - `password`: `admin123`
+- User
+  - `username`: `student`
+  - `password`: `student123`
 
-This creates:
-- `admins` table
-- `notices` table
-- indexes + default admin seed (`admin` / `admin123`)
+These users are auto-seeded on backend startup.
 
-### 2) Backend
+## Folder Structure
+
+- `client/` React application
+- `server/` Express + MongoDB API
+
+## Local Setup
+
+1. Install dependencies from the project root:
+
 ```bash
-cd server
 npm install
 ```
 
-Create `.env` from `.env.example` and update values:
-- `DB_HOST`
-- `DB_PORT`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_NAME`
-- `JWT_SECRET`
+2. Create environment files:
 
-Run backend:
+- Copy `server/.env.example` to `server/.env`
+- Copy `client/.env.example` to `client/.env`
+
+3. Update the values:
+
+- `server/.env`
+  - `MONGODB_URI`
+  - `JWT_SECRET`
+  - `CLIENT_ORIGIN`
+- `client/.env`
+  - `REACT_APP_API_URL`
+  - `REACT_APP_BACKEND_ORIGIN`
+
+4. Run the full stack from the root:
+
 ```bash
 npm run dev
 ```
 
-API base URL: `http://localhost:5000/api`
+5. Open:
 
-### 3) Frontend
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:5000`
+
+## Production Deployment
+
+### Backend on Render or Railway
+
+Use the `server/` directory as the service root.
+
+- Build command: `npm install`
+- Start command: `npm start`
+- Required environment variables:
+  - `MONGODB_URI`
+  - `JWT_SECRET`
+  - `CLIENT_ORIGIN`
+  - `PORT`
+
+### Frontend on Vercel
+
+Use the `client/` directory as the project root.
+
+- Build command: `npm run build`
+- Output directory: `build`
+- Required environment variables:
+  - `REACT_APP_API_URL=https://your-backend-domain/api`
+  - `REACT_APP_BACKEND_ORIGIN=https://your-backend-domain`
+
+### MongoDB Atlas
+
+- Create a cluster
+- Add your backend host IP to network access
+- Create a database user
+- Paste the Atlas connection string into `MONGODB_URI`
+
+## Features
+
+- JWT login with Admin and User roles
+- Admin notice CRUD
+- Scheduled publishing with automatic activation
+- Important notices with glow animation
+- Attachment uploads for PDFs and images
+- Read and unread tracking
+- Bookmark or favorite notices
+- Search, filters, and pagination
+- New notice badge
+- Toast notifications
+- Loading skeletons
+- Responsive sidebar layout
+- Dark and light theme toggle
+
+## GitHub Workflow
+
+After local verification, run:
+
 ```bash
-cd client
-npm install
-npm start
+git add .
+git commit -m "Build production-ready digital notice board"
+git remote add origin <your-github-repo-url>
+git push -u origin main
 ```
 
-Frontend URL: `http://localhost:3000`
+## Notes
 
-## Core Features
-- Role-based login (superadmin/admin/editor/viewer/student)
-- Notice CRUD with scheduling, expiry, archive status
-- File attachment upload (PDF/image)
-- Search + category filtering + pagination + read/unread
-- Important notices with color highlighting
-- Live updates (SSE + polling fallback)
-- Notification subscriptions (email/whatsapp/push) + delivery logs
-- Audit logs and analytics dashboard
-- Reports export (CSV + printable report for PDF save)
-- Responsive UI (mobile + desktop), loaders and toast notifications
+- Live deployment URLs depend on your Vercel, Render/Railway, and GitHub accounts, so they must be created with your credentials.
+- The backend seeds the required users automatically if they do not already exist.

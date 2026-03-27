@@ -3,31 +3,37 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path");
+
+const { connectDB } = require("./config/db");
+const { seedDefaults } = require("./utils/seedDefaults");
+const { startScheduler, publishScheduledNotices } = require("./utils/scheduler");
+const authRoutes = require("./routes/authRoutes");
+const noticeRoutes = require("./routes/noticeRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 dotenv.config();
 
-const { connectDB } = require("./config/db");
-const noticeRoutes = require("./routes/noticeRoutes");
-const authRoutes = require("./routes/authRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const { notFound, errorHandler } = require("./middleware/errorMiddleware");
-const path = require("path");
-connectDB();
-
 const app = express();
 
-app.use(helmet());
 app.use(
   cors({
     origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
+    credentials: true,
   })
 );
-app.use(express.json({ limit: "1mb" }));
+app.use(helmet());
+app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.json({
+    status: "ok",
+    service: "digital-notice-board-api",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.use("/api/auth", authRoutes);
@@ -38,6 +44,21 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    await seedDefaults();
+    await publishScheduledNotices();
+    startScheduler();
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
