@@ -1,0 +1,21 @@
+{
+  "explorer.sortOrder": "type",
+  "explorer.compactFolders": false,
+  "files.exclude": {
+    "**/.git": true,
+    "**/node_modules": true,
+    ".codex-runlogs": true,
+    "client/build": true,
+    "client/client_start.log": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    ".codex-runlogs": true,
+    "client/build": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    ".codex-runlogs/**": true,
+    "client/build/**": true
+  }
+}
