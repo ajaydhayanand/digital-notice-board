@@ -16,10 +16,26 @@ const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 dotenv.config();
 
 const app = express();
+const allowedOrigins = `${process.env.CLIENT_ORIGIN || "http://localhost:3000"}`
+  .split(/[\r\n,]+/)
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
     credentials: true,
   })
 );
