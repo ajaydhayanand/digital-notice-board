@@ -1,10 +1,10 @@
 # Digital Notice Board
 
-Digital Notice Board is a premium full-stack notice management platform built for campuses, hackathons, and placement-ready demos. It includes JWT authentication, admin/user role separation, scheduled publishing, bookmarks, read tracking, a modern animated React UI, and a MongoDB-backed Express API.
+Digital Notice Board is a premium full-stack notice management platform built for campuses, hackathons, and placement-ready demos. It includes JWT authentication, admin/user role separation, scheduled publishing, bookmarks, read tracking, a modern React UI, and a MongoDB-backed Express API.
 
 ## Tech Stack
 
-- Frontend: React, Tailwind CSS, Framer Motion
+- Frontend: React, Tailwind CSS
 - Backend: Node.js, Express
 - Database: MongoDB Atlas or local MongoDB with Mongoose
 - Auth: JWT
@@ -78,6 +78,8 @@ Use the `server/` directory as the service root.
   - `CLIENT_ORIGIN`
   - `PORT`
 
+If you use Render, the repository now includes a root-level `render.yaml` blueprint for the backend service.
+
 ### Frontend on Vercel
 
 Use the `client/` directory as the project root.
@@ -87,6 +89,8 @@ Use the `client/` directory as the project root.
 - Required environment variables:
   - `REACT_APP_API_URL=https://your-backend-domain/api`
   - `REACT_APP_BACKEND_ORIGIN=https://your-backend-domain`
+
+The repository also includes `client/vercel.json` so React Router routes resolve correctly in production.
 
 ### MongoDB Atlas
 
@@ -126,3 +130,4 @@ git push -u origin main
 
 - Live deployment URLs depend on your Vercel, Render/Railway, and GitHub accounts, so they must be created with your credentials.
 - The backend seeds the required users automatically if they do not already exist.
+- File uploads are currently stored on the backend filesystem. This is fine for demos, but uploaded files can be lost on backend redeploys unless you later move them to cloud storage.
