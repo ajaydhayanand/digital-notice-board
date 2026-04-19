@@ -27,8 +27,8 @@ export const ToastProvider = ({ children }) => {
             key={toast.id}
             className={`rounded-2xl border px-4 py-3 text-sm shadow-lg backdrop-blur ${
               toast.type === "error"
-                ? "border-rose-400/30 bg-rose-400/15 text-rose-100"
-                : "border-emerald-400/30 bg-emerald-400/15 text-emerald-100"
+                ? "border-rose-400/30 bg-rose-400/15 text-rose-700 dark:text-rose-100"
+                : "border-emerald-400/30 bg-emerald-400/15 text-emerald-700 dark:text-emerald-100"
             }`}
           >
             {toast.message}

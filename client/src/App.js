@@ -44,7 +44,15 @@ function AppShell() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.body.dataset.theme = theme;
     saveTheme(theme);
+
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) {
+      themeColor.setAttribute("content", theme === "dark" ? "#020617" : "#f3f7ff");
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -71,16 +79,16 @@ function AppShell() {
           newCount={feedMeta.newCount || 0}
         />
 
-        <main className="rounded-[2rem] border border-white/10 bg-slate-950/55 p-5 shadow-2xl shadow-slate-950/30 backdrop-blur-xl sm:p-8">
-          <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+        <main className="rounded-[2rem] border border-slate-200/70 bg-white/75 p-5 shadow-2xl shadow-slate-200/80 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/55 dark:shadow-slate-950/30 sm:p-8">
+          <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/70 pb-6 dark:border-white/10">
             <div>
-              <p className="text-xs uppercase tracking-[0.32em] text-slate-400">Welcome back</p>
-              <h2 className="mt-2 text-3xl font-semibold text-white">
+              <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">Welcome back</p>
+              <h2 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">
                 {user?.role === "admin" ? "Administrator Control Room" : "Your Notice Feed"}
               </h2>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">
-              Signed in as <span className="font-semibold text-white">{user?.username}</span>
+            <div className="rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+              Signed in as <span className="font-semibold text-slate-900 dark:text-white">{user?.username}</span>
             </div>
           </header>
 

@@ -159,22 +159,22 @@ function AdminDashboard() {
   return (
     <section className="space-y-8">
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.2),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.15),transparent_24%),rgba(15,23,42,0.78)] p-8">
+        <div className="overflow-hidden rounded-[2rem] border border-slate-200/70 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.15),transparent_24%),rgba(255,255,255,0.92)] p-8 dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.2),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.15),transparent_24%),rgba(15,23,42,0.78)]">
           <p className="text-xs uppercase tracking-[0.38em] text-cyan-300">Admin studio</p>
-          <h2 className="mt-4 text-4xl font-semibold text-white">Create, schedule, and spotlight notices.</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+          <h2 className="mt-4 text-4xl font-semibold text-slate-900 dark:text-white">Create, schedule, and spotlight notices.</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300">
             Shape the entire notice experience from one premium workspace. Schedule future posts, upload
             attachments, and elevate critical information with one click.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
+        <form onSubmit={handleSubmit} className="rounded-[2rem] border border-slate-200/70 bg-white/85 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+              <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
                 {editingId ? "Edit notice" : "Create notice"}
               </p>
-              <h3 className="mt-2 text-2xl font-semibold text-white">Notice composer</h3>
+              <h3 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Notice composer</h3>
             </div>
             {editingId && (
               <button type="button" onClick={resetForm} className="btn-secondary">
@@ -199,16 +199,16 @@ function AdminDashboard() {
             />
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm text-slate-300">Publish time</span>
+                <span className="mb-2 block text-sm text-slate-700 dark:text-slate-300">Publish time</span>
                 <input
                   type="datetime-local"
                   className="input-base"
                   value={form.publishAt}
                   onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
                 />
-                <p className="mt-2 text-xs text-slate-400">Leave empty to publish immediately.</p>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Leave empty to publish immediately.</p>
               </label>
-              <label className="flex items-end gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white">
+              <label className="flex items-end gap-3 rounded-3xl border border-slate-200/80 bg-white px-4 py-4 text-sm text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white">
                 <input
                   type="checkbox"
                   checked={form.isImportant}
@@ -224,7 +224,7 @@ function AdminDashboard() {
               </span>
               <input type="file" accept=".pdf,image/*" onChange={handleAttachment} className="hidden" />
             </label>
-            <p className="text-xs text-slate-400">Attachment is optional. You can send a message-only notice.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Attachment is optional. You can send a message-only notice.</p>
             <button type="submit" disabled={saving} className="btn-primary w-full justify-center">
               {saving ? (
                 "Saving..."
@@ -245,7 +245,7 @@ function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Notices" value={stats.totalNotices || 0} accent="border-white/10 bg-white/5" />
+        <StatCard label="Total Notices" value={stats.totalNotices || 0} accent="border-slate-200/70 bg-white/85 dark:border-white/10 dark:bg-white/5" />
         <StatCard label="Important" value={stats.importantNotices || 0} accent="border-amber-300/20 bg-amber-300/10" />
         <StatCard label="Scheduled" value={stats.scheduledNotices || 0} accent="border-cyan-300/20 bg-cyan-300/10" />
         <StatCard label="Published" value={stats.publishedNotices || 0} accent="border-emerald-300/20 bg-emerald-300/10" />
@@ -270,7 +270,7 @@ function AdminDashboard() {
               className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                 status === value
                   ? "border-cyan-300/60 bg-cyan-300 text-slate-950"
-                  : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+                  : "border-slate-200/70 bg-white/75 text-slate-700 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
               }`}
             >
               {value}
@@ -291,26 +291,28 @@ function AdminDashboard() {
             <article
               key={notice.id}
               className={`rounded-3xl border p-5 ${
-                notice.isImportant ? "border-amber-300/30 bg-amber-300/10" : "border-white/10 bg-white/5"
+                notice.isImportant
+                  ? "border-amber-300/30 bg-amber-300/10"
+                  : "border-slate-200/70 bg-white/85 dark:border-white/10 dark:bg-white/5"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{notice.status}</p>
-                  <h3 className="mt-2 text-xl font-semibold text-white">{notice.title}</h3>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">{notice.status}</p>
+                  <h3 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">{notice.title}</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleImportantToggle(notice)}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-3 text-amber-200 transition hover:bg-white/10"
+                  className="rounded-2xl border border-slate-200/80 bg-white p-3 text-amber-500 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-amber-200 dark:hover:bg-white/10"
                 >
                   <Star className={`h-4 w-4 ${notice.isImportant ? "fill-current" : ""}`} />
                 </button>
               </div>
-              <p className="mt-4 text-sm leading-7 text-slate-300">
+              <p className="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-300">
                 {notice.description.length > 220 ? `${notice.description.slice(0, 220)}...` : notice.description}
               </p>
-              <div className="mt-6 space-y-2 text-xs text-slate-400">
+              <div className="mt-6 space-y-2 text-xs text-slate-500 dark:text-slate-400">
                 <p className="inline-flex items-center gap-2">
                   <CalendarClock className="h-4 w-4" />
                   {new Date(notice.publishAt).toLocaleString()}
@@ -331,8 +333,8 @@ function AdminDashboard() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/5 p-4">
-        <p className="text-sm text-slate-300">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200/70 bg-white/85 p-4 dark:border-white/10 dark:bg-white/5">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           Page {meta.page || 1} of {meta.totalPages || 1}
         </p>
         <div className="flex gap-3">
@@ -340,7 +342,7 @@ function AdminDashboard() {
             type="button"
             disabled={(meta.page || 1) <= 1}
             onClick={() => setPage((current) => Math.max(current - 1, 1))}
-            className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full border border-slate-200/80 bg-white px-4 py-2 text-sm text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
           >
             Previous
           </button>

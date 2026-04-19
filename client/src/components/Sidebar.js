@@ -8,15 +8,17 @@ function Sidebar({ theme, onToggleTheme, newCount }) {
 
   const navClass = ({ isActive }) =>
     `flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition ${
-      isActive ? "bg-white text-slate-950 shadow-lg" : "text-slate-300 hover:bg-white/10 hover:text-white"
+      isActive
+        ? "bg-slate-900 text-white shadow-lg dark:bg-white dark:text-slate-950"
+        : "text-slate-600 hover:bg-slate-900/5 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
     }`;
 
   return (
-    <aside className="w-full rounded-[2rem] border border-white/10 bg-slate-950/80 p-5 shadow-2xl shadow-cyan-950/30 lg:w-72">
+    <aside className="w-full rounded-[2rem] border border-slate-200/70 bg-white/80 p-5 shadow-2xl shadow-slate-200/70 dark:border-white/10 dark:bg-slate-950/80 dark:shadow-cyan-950/30 lg:w-72">
       <div className="mb-8 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Digital Notice Board</p>
-          <h1 className="mt-2 text-2xl font-semibold text-white">Campus Pulse</h1>
+          <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Campus Pulse</h1>
         </div>
         <div className="h-12 w-12 rounded-2xl bg-[radial-gradient(circle_at_30%_30%,rgba(34,211,238,0.9),rgba(14,116,144,0.2))] shadow-lg shadow-cyan-500/30" />
       </div>
@@ -41,12 +43,12 @@ function Sidebar({ theme, onToggleTheme, newCount }) {
         )}
       </nav>
 
-      <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-4">
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Theme</p>
+      <div className="mt-8 rounded-3xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
+        <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Theme</p>
         <button
           type="button"
           onClick={onToggleTheme}
-          className="mt-3 flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white transition hover:bg-white/10"
+          className="mt-3 flex w-full items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
         >
           <span>{theme === "dark" ? "Dark mode" : "Light mode"}</span>
           {theme === "dark" ? <MoonStar className="h-4 w-4" /> : <SunMedium className="h-4 w-4" />}

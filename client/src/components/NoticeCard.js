@@ -9,7 +9,7 @@ function NoticeCard({ notice, onBookmarkToggle, onReadToggle, compact = false })
       className={`group relative overflow-hidden rounded-3xl border p-5 backdrop-blur-xl ${
         notice.isImportant
           ? "border-amber-300/50 bg-amber-200/10 shadow-glow animate-pulse-soft"
-          : "border-white/10 bg-white/5"
+          : "border-slate-200/70 bg-white/85 dark:border-white/10 dark:bg-white/5"
       } ${notice.isRead ? "opacity-90" : ""}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.16),transparent_30%)] opacity-70" />
@@ -18,12 +18,12 @@ function NoticeCard({ notice, onBookmarkToggle, onReadToggle, compact = false })
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               {notice.isImportant && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/40 bg-amber-300/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-100">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/40 bg-amber-300/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-700 dark:text-amber-100">
                   <Sparkles className="h-3.5 w-3.5" />
                   Important
                 </span>
               )}
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-slate-300">
+              <span className="rounded-full border border-slate-200/80 bg-white/80 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                 {notice.status}
               </span>
               {!notice.isRead && (
@@ -32,23 +32,23 @@ function NoticeCard({ notice, onBookmarkToggle, onReadToggle, compact = false })
                 </span>
               )}
             </div>
-            <h3 className="text-xl font-semibold text-white">{notice.title || "Notice"}</h3>
+            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{notice.title || "Notice"}</h3>
           </div>
 
           <button
             type="button"
             onClick={() => onBookmarkToggle?.(notice.id)}
-            className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-200 transition hover:border-cyan-300/40 hover:text-cyan-200"
+            className="rounded-2xl border border-slate-200/80 bg-white p-3 text-slate-600 transition hover:border-cyan-300/40 hover:text-cyan-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:text-cyan-200"
           >
             {notice.isBookmarked ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
           </button>
         </div>
 
-        <p className="text-sm leading-7 text-slate-300">
+        <p className="text-sm leading-7 text-slate-600 dark:text-slate-300">
           {compact && notice.description.length > 180 ? `${notice.description.slice(0, 180)}...` : notice.description}
         </p>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
           <span className="inline-flex items-center gap-2">
             <Clock3 className="h-4 w-4" />
             {new Date(notice.publishAt).toLocaleString()}
@@ -66,7 +66,7 @@ function NoticeCard({ notice, onBookmarkToggle, onReadToggle, compact = false })
           <button
             type="button"
             onClick={() => onReadToggle?.(notice.id, !notice.isRead)}
-            className="inline-flex items-center rounded-full border border-white/12 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/8"
+            className="inline-flex items-center rounded-full border border-slate-200/80 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 dark:border-white/10 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
           >
             Mark as {notice.isRead ? "Unread" : "Read"}
           </button>
